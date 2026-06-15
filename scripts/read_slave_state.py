@@ -23,7 +23,7 @@ def main() -> None:
     config = load_config(Path(args.config))
     can_interface = args.can or config.can.interface
     writer = PiperSlaveWriter(can_interface, config.piper)
-    status = RateLimitedPrinter(config.logging.status_hz)
+    status = RateLimitedPrinter(config.network.status_rate_hz)
 
     print(f"[STATE] Connecting to slave Piper on {can_interface}; no motion is commanded", flush=True)
     writer.connect()

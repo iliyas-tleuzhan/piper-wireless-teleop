@@ -2,6 +2,7 @@ network:
   udp_port: 5005
   send_rate_hz: 50
   receiver_timeout_s: 0.5
+  status_rate_hz: 2
   socket_timeout_s: 0.02
 
 can:
@@ -16,10 +17,8 @@ piper:
   gripper_default_effort: 1000
 
 safety:
-  max_step_deg: 3.0
-  startup_sync_required: true
-  startup_sync_tolerance_deg: 10.0
+  enable_slew_limit: false
+  startup_sync_required: false
 
 logging:
-  status_hz: 2
   verbose_packets: false

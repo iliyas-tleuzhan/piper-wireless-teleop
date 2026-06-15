@@ -56,7 +56,7 @@ class SlavePacketTracker:
             if self.last_seq is not None and sequence <= self.last_seq:
                 return PacketDecision(
                     accepted=False,
-                    reason=f"duplicate/out-of-order seq={sequence} last_seq={self.last_seq}",
+                    reason=f"duplicate/out-of-order packet seq={sequence} last_seq={self.last_seq}",
                     sequence=sequence,
                     total_dropped=self.total_dropped,
                 )

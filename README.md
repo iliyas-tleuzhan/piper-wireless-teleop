@@ -92,10 +92,15 @@ PYTHONPATH=. python scripts/test_udp.py sender --target-ip <COMPUTER_2_IP> --por
 ## Configuration
 
 Defaults live in `configs/default.yaml`. Normal commands do not include `--speed`
-or `--max-jump-deg`; speed, follow mode, receiver timeout, status rate, and slew
-limit are config values. Sender packet timestamps are for debugging only. The
-slave uses receiver-side `time.monotonic()` and sequence numbers, so Computer 1
-and Computer 2 wall clocks do not need to be synchronized for timeout safety.
+or `--max-jump-deg`; Piper mode, speed, receiver timeout, and status rate are
+config values. Sender packet timestamps are for debugging only. The slave uses
+receiver-side `time.monotonic()` and sequence numbers, so Computer 1 and
+Computer 2 wall clocks do not need to be synchronized for timeout safety.
+
+Wireless teleop commands the latest valid master target directly by default.
+Slew limiting is disabled by default because limiting every packet makes the
+slave feel much slower than wired Piper master-slave teleoperation. It remains
+available only as an explicit config fallback with `safety.enable_slew_limit`.
 
 Important defaults:
 
@@ -103,10 +108,10 @@ Important defaults:
 - UDP port: `5005`
 - Master send rate: `50 Hz`
 - Receiver timeout: `0.5 s`
+- Status output: `2 Hz`
 - Piper speed percent: `100`
 - Follow/high-follow mode: `0xAD`
-- Slew limit: `3.0 degrees`
-- Status output: `2 Hz`
+- Slew limiting: disabled by default
 
 ## Troubleshooting Summary
 
@@ -115,6 +120,7 @@ Important defaults:
 - UDP packets not arriving: verify IP address, firewall, subnet, and port `5005`.
 - Slave not moving: confirm `--confirm MOVE`, `--deadman`, Piper enable state, and
   that valid packets are arriving before the receiver timeout.
+- Negative packet age: no longer a safety error; sender timestamps are debug-only.
 - Delayed movement: reduce Wi-Fi congestion, avoid verbose packet logging, and
   keep the control machines close to the access point.
 

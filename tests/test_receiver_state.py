@@ -29,6 +29,31 @@ def test_old_sender_timestamp_is_not_rejected() -> None:
     assert decision.target_joints == [0, 1000, -1000, 0, 0, 0]
 
 
+def test_future_sender_timestamp_is_not_rejected() -> None:
+    """A sender clock ahead of the receiver does not make a packet unsafe."""
+
+    tracker = SlavePacketTracker()
+
+    decision = tracker.process_packet(packet(seq=1, timestamp=999999.0), receiver_time_s=10.0)
+
+    assert decision.accepted
+    assert decision.sequence == 1
+
+
+def test_negative_wall_clock_age_would_still_be_accepted() -> None:
+    """Negative wall-clock age is irrelevant because receiver monotonic time is used."""
+
+    tracker = SlavePacketTracker()
+    sender_timestamp = 112.8
+    receiver_wall_time = 100.0
+
+    assert receiver_wall_time - sender_timestamp < 0
+    assert tracker.process_packet(
+        packet(seq=1, timestamp=sender_timestamp),
+        receiver_time_s=50.0,
+    ).accepted
+
+
 def test_duplicate_and_out_of_order_sequences_are_ignored() -> None:
     """Sequence numbers protect against replayed or reordered UDP packets."""
 

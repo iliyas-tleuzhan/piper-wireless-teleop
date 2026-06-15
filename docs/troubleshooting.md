@@ -47,12 +47,23 @@ different. Sender timestamps are not used for safety-critical packet rejection.
 NTP is still useful for log comparison, but it is not required for teleoperation
 timeout behavior.
 
+If older logs reported a negative stale-packet age, that was the old
+cross-computer timestamp bug. Negative packet age is no longer treated as an
+error.
+
 ## Duplicate or Out-of-Order Packets
 
 The slave ignores packets whose `seq` is less than or equal to the last accepted
 sequence number. If dropped packet counts rise, inspect Wi-Fi quality, network
 load, and whether multiple master senders are accidentally targeting the same
 slave receiver.
+
+## Slave Barely Moves
+
+Slew limiting is disabled by default. If the slave still barely moves, check
+whether your config explicitly sets `safety.enable_slew_limit: true`, whether
+the master is sending changing joint targets, and whether `deadman=true` packets
+are being accepted.
 
 ## Wrong IP Address
 

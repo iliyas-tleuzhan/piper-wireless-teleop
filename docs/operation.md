@@ -37,6 +37,10 @@ timeout safety. The sender timestamp is kept only for debugging, so the two
 computers do not need synchronized wall clocks to avoid false stale-packet
 rejection.
 
+Accepted packets are commanded directly to the slave by default. Slew limiting
+is disabled by default because it made wireless motion much slower than wired
+Piper master-slave teleoperation.
+
 ## Test UDP Before Moving
 
 Computer 2:

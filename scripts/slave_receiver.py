@@ -3,8 +3,9 @@
 
 Run this on Computer 2, connected only to the slave Piper CAN bus. Movement is
 refused unless ``--confirm MOVE`` is passed. Incoming targets are checked for
-deadman, sequence ordering, and shape, then commanded through ``piper_sdk`` with
-per-cycle slew limiting as an internal safety fallback.
+deadman, sequence ordering, and shape, then commanded immediately through
+``piper_sdk``. Optional slew limiting is disabled by default because the normal
+wireless bridge should follow the latest master target like wired teleoperation.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ import argparse
 import time
 from pathlib import Path
 
-from piper_wireless_teleop.config import load_config
+from piper_wireless_teleop.config import SafetyConfig, load_config
 from piper_wireless_teleop.logging_utils import RateLimitedPrinter
 from piper_wireless_teleop.packet import decode_packet
 from piper_wireless_teleop.receiver_state import SlavePacketTracker
@@ -54,6 +55,27 @@ def warn_if_receiver_timeout(
     status.print(f"[SLAVE] No valid packets for {idle_text:.2f}s; holding last command")
 
 
+def choose_command_joints(
+    *,
+    last_commanded_joints: list[int] | None,
+    target_joints: list[int],
+    safety_config: SafetyConfig,
+) -> list[int]:
+    """Choose the slave command for a target packet.
+
+    Default behavior is direct passthrough of the latest valid target. Slew
+    limiting is retained only as an explicit hidden safety fallback because
+    limiting every packet makes wireless teleop feel much slower than wired
+    Piper master-slave operation.
+    """
+
+    if not safety_config.enable_slew_limit or last_commanded_joints is None:
+        return clamp_joints_raw(target_joints)
+
+    max_step_raw = deg_to_raw(safety_config.max_step_deg)
+    return clamp_joints_raw(limit_step_raw(last_commanded_joints, target_joints, max_step_raw))
+
+
 def main() -> None:
     """Run the UDP-to-Piper slave bridge."""
 
@@ -64,11 +86,10 @@ def main() -> None:
     config = load_config(Path(args.config))
     can_interface = args.can or config.can.interface
     udp_port = args.udp_port or config.network.udp_port
-    max_step_raw = deg_to_raw(config.safety.max_step_deg)
 
     receiver = UdpReceiver(args.bind_ip, udp_port, config.network.socket_timeout_s)
     writer = PiperSlaveWriter(can_interface, config.piper)
-    status = RateLimitedPrinter(config.logging.status_hz)
+    status = RateLimitedPrinter(config.network.status_rate_hz)
     tracker = SlavePacketTracker()
 
     print(f"[SLAVE] Listening on {args.bind_ip}:{udp_port}", flush=True)
@@ -103,7 +124,10 @@ def main() -> None:
             if decision.warning:
                 status.print(f"[SLAVE] {decision.warning}")
             if not decision.accepted:
-                status.print(f"[SLAVE] Ignoring packet from {address[0]}: {decision.reason}")
+                if decision.reason and decision.reason.startswith("duplicate/out-of-order"):
+                    status.print(f"[SLAVE] {decision.reason}")
+                else:
+                    status.print(f"[SLAVE] Ignoring packet from {address[0]}: {decision.reason}")
                 warn_if_receiver_timeout(tracker, status, config.network.receiver_timeout_s)
                 continue
 
@@ -112,14 +136,10 @@ def main() -> None:
                 status.print(f"[SLAVE] Ignoring packet from {address[0]}: missing joints")
                 continue
 
-            if last_commanded_joints is None:
-                # Initialize the slew limiter at the first safe target. Operators
-                # should still start with both arms in similar poses; this avoids
-                # an artificial jump from zeros on the first packet.
-                last_commanded_joints = target_joints
-
-            next_joints = clamp_joints_raw(
-                limit_step_raw(last_commanded_joints, target_joints, max_step_raw)
+            next_joints = choose_command_joints(
+                last_commanded_joints=last_commanded_joints,
+                target_joints=target_joints,
+                safety_config=config.safety,
             )
             writer.send_joints(next_joints)
 
@@ -137,19 +157,19 @@ def main() -> None:
             command_rate_hz = tracker.command_rate_hz(time.monotonic())
             command_rate_text = "unknown" if command_rate_hz is None else f"{command_rate_hz:.1f}Hz"
 
-            # This offset is a debug hint only. It is not used to accept or
-            # reject packets because Computer 1 and Computer 2 clocks may differ.
             sender_offset_s = None
-            if decision.sender_timestamp is not None:
+            if config.logging.verbose_packets and decision.sender_timestamp is not None:
+                # Debug hint only. It is never used to accept or reject packets
+                # because Computer 1 and Computer 2 clocks may differ.
                 sender_offset_s = time.time() - decision.sender_timestamp
-            sender_offset_text = (
-                "n/a" if sender_offset_s is None else f"{sender_offset_s:+.3f}s"
+            sender_debug_text = (
+                "" if sender_offset_s is None else f" sender_offset_debug={sender_offset_s:+.3f}s"
             )
 
             status.print(
-                f"[SLAVE] from={address[0]} seq={decision.sequence} "
+                f"[SLAVE] accepted packet from={address[0]} seq={decision.sequence} "
                 f"dropped={decision.dropped} total_dropped={decision.total_dropped} "
-                f"cmd_rate={command_rate_text} sender_offset_debug={sender_offset_text} "
+                f"cmd_rate={command_rate_text}{sender_debug_text} "
                 f"target_deg={[round(raw_to_deg(value), 3) for value in target_joints]} "
                 f"cmd_deg={[round(raw_to_deg(value), 3) for value in next_joints]}"
             )

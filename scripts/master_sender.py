@@ -49,7 +49,7 @@ def main() -> None:
 
     bus = can.interface.Bus(channel=can_interface, interface="socketcan")
     sender = UdpSender(args.target_ip, target_port)
-    status = RateLimitedPrinter(config.logging.status_hz)
+    status = RateLimitedPrinter(config.network.status_rate_hz)
     state = MasterCommandState()
 
     sequence = 0

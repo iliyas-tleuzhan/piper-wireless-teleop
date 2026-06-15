@@ -23,8 +23,8 @@ PYTHONPATH=. python scripts/master_sender.py --can can0 --target-ip <COMPUTER_2_
 
 ## `scripts/slave_receiver.py`
 
-Runs on Computer 2. Receives UDP packets, validates them, applies slew limiting,
-and commands the slave Piper through `piper_sdk`.
+Runs on Computer 2. Receives UDP packets, validates them, and commands the latest
+valid target directly through `piper_sdk`.
 
 Moves robot: yes. Requires `--confirm MOVE`.
 

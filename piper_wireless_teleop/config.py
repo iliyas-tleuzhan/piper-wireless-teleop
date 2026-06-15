@@ -20,6 +20,7 @@ class NetworkConfig:
     udp_port: int
     send_rate_hz: float
     receiver_timeout_s: float
+    status_rate_hz: float
     socket_timeout_s: float
 
     @property
@@ -54,8 +55,9 @@ class PiperConfig:
 
 @dataclass(frozen=True)
 class SafetyConfig:
-    """Runtime safety checks and slew limiting settings."""
+    """Runtime safety checks and optional slew limiting settings."""
 
+    enable_slew_limit: bool
     max_step_deg: float
     startup_sync_required: bool
     startup_sync_tolerance_deg: float
@@ -98,9 +100,15 @@ def load_config(path: str | Path) -> AppConfig:
         raw = yaml.safe_load(handle) or {}
 
     network_raw = raw["network"]
+    logging_raw = raw.get("logging", {})
+    safety_raw = raw.get("safety", {})
     receiver_timeout_s = network_raw.get(
         "receiver_timeout_s",
         network_raw.get("max_packet_age_s", 0.5),
+    )
+    status_rate_hz = network_raw.get(
+        "status_rate_hz",
+        logging_raw.get("status_hz", 2),
     )
 
     return AppConfig(
@@ -108,6 +116,7 @@ def load_config(path: str | Path) -> AppConfig:
             udp_port=int(network_raw["udp_port"]),
             send_rate_hz=float(network_raw["send_rate_hz"]),
             receiver_timeout_s=float(receiver_timeout_s),
+            status_rate_hz=float(status_rate_hz),
             socket_timeout_s=float(network_raw["socket_timeout_s"]),
         ),
         can=CanConfig(
@@ -122,12 +131,13 @@ def load_config(path: str | Path) -> AppConfig:
             gripper_default_effort=int(raw["piper"]["gripper_default_effort"]),
         ),
         safety=SafetyConfig(
-            max_step_deg=float(raw["safety"]["max_step_deg"]),
-            startup_sync_required=bool(raw["safety"]["startup_sync_required"]),
-            startup_sync_tolerance_deg=float(raw["safety"]["startup_sync_tolerance_deg"]),
+            enable_slew_limit=bool(safety_raw.get("enable_slew_limit", False)),
+            max_step_deg=float(safety_raw.get("max_step_deg", 3.0)),
+            startup_sync_required=bool(safety_raw.get("startup_sync_required", False)),
+            startup_sync_tolerance_deg=float(safety_raw.get("startup_sync_tolerance_deg", 10.0)),
         ),
         logging=LoggingConfig(
-            status_hz=float(raw["logging"]["status_hz"]),
-            verbose_packets=bool(raw["logging"]["verbose_packets"]),
+            status_hz=float(status_rate_hz),
+            verbose_packets=bool(logging_raw.get("verbose_packets", False)),
         ),
     )

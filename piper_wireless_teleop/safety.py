@@ -2,7 +2,7 @@
 
 Piper joint targets are represented in raw units of 0.001 degrees. The helpers
 here clamp decoded targets to documented joint ranges, validate packet shape,
-and slew-limit motion commands sent to the slave arm.
+and provide optional step-limiting primitives for explicit fallback use.
 """
 
 from __future__ import annotations
