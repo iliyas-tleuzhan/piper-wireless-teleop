@@ -1,7 +1,7 @@
 network:
   udp_port: 5005
   send_rate_hz: 50
-  max_packet_age_s: 0.25
+  receiver_timeout_s: 0.5
   socket_timeout_s: 0.02
 
 can:

@@ -18,7 +18,7 @@ packets continuously at the configured rate.
 Moves robot: no, but it sends motion targets.
 
 ```bash
-python scripts/master_sender.py --target-ip <COMPUTER_2_IP> --can can0 --deadman
+PYTHONPATH=. python scripts/master_sender.py --can can0 --target-ip <COMPUTER_2_IP> --deadman
 ```
 
 ## `scripts/slave_receiver.py`
@@ -29,7 +29,7 @@ and commands the slave Piper through `piper_sdk`.
 Moves robot: yes. Requires `--confirm MOVE`.
 
 ```bash
-python scripts/slave_receiver.py --can can0 --confirm MOVE
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE
 ```
 
 ## `scripts/decode_master_can.py`
@@ -39,7 +39,7 @@ Runs on Computer 1. Prints decoded master joint and gripper command frames.
 Moves robot: no.
 
 ```bash
-python scripts/decode_master_can.py --can can0
+PYTHONPATH=. python scripts/decode_master_can.py --can can0
 ```
 
 ## `scripts/read_slave_state.py`
@@ -49,7 +49,7 @@ Runs on Computer 2. Connects to the slave Piper and prints SDK feedback.
 Moves robot: no.
 
 ```bash
-python scripts/read_slave_state.py --can can0
+PYTHONPATH=. python scripts/read_slave_state.py --can can0
 ```
 
 ## `scripts/test_slave_small_move.py`
@@ -60,7 +60,7 @@ by 1 degree slowly.
 Moves robot: yes. Requires `--confirm MOVE`.
 
 ```bash
-python scripts/test_slave_small_move.py --can can0 --confirm MOVE
+PYTHONPATH=. python scripts/test_slave_small_move.py --can can0 --confirm MOVE
 ```
 
 ## `scripts/test_udp.py`
@@ -70,6 +70,6 @@ Runs on either computer. Tests UDP transport without Piper hardware.
 Moves robot: no.
 
 ```bash
-python scripts/test_udp.py receiver --bind-ip 0.0.0.0 --port 5005
-python scripts/test_udp.py sender --target-ip <COMPUTER_2_IP> --port 5005
+PYTHONPATH=. python scripts/test_udp.py receiver --bind-ip 0.0.0.0 --port 5005
+PYTHONPATH=. python scripts/test_udp.py sender --target-ip <COMPUTER_2_IP> --port 5005
 ```

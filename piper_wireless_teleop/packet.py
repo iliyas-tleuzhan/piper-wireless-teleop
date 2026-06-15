@@ -4,6 +4,10 @@ JSON is used intentionally for readability while bringing up the system and
 debugging packets with common tools. The module boundary keeps serialization in
 one place so the wire format can later be replaced with msgpack without changing
 the CAN reader, UDP transport, or Piper writer logic.
+
+Packets include a sender ``timestamp`` for log correlation only. The receiver
+must not use that wall-clock value for safety decisions because the two
+computers may not have synchronized clocks.
 """
 
 from __future__ import annotations
@@ -24,8 +28,14 @@ def make_packet(
     deadman: bool,
     joints_raw: list[int],
     gripper: dict[str, int] | None = None,
+    mode_frame: list[int] | None = None,
 ) -> dict[str, Any]:
-    """Build a teleoperation packet from decoded Piper command targets."""
+    """Build a teleoperation packet from decoded Piper command targets.
+
+    ``timestamp`` is the sender wall-clock time and is useful for optional
+    debugging. Freshness and timeout checks belong on receiver-side monotonic
+    time, not this field.
+    """
 
     return {
         "type": PACKET_TYPE,
@@ -35,6 +45,7 @@ def make_packet(
         "joints": [int(value) for value in joints_raw],
         "joints_deg": [raw_to_deg(value) for value in joints_raw],
         "gripper": gripper,
+        "mode_frame": None if mode_frame is None else [int(value) for value in mode_frame],
     }
 
 

@@ -26,9 +26,10 @@ It decodes the relevant Piper command IDs:
 - `0x157`: joint 5 and joint 6 targets.
 - `0x159`: gripper command.
 
-Computer 2 receives UDP packets, validates them, applies freshness and deadman
-checks, slew-limits the joint targets, and calls `piper_sdk` methods such as
-`JointCtrl()` and `GripperCtrl()`.
+Computer 2 receives UDP packets, validates them, applies deadman and sequence
+ordering checks, tracks receiver-side monotonic timeout state, slew-limits the
+joint targets, and calls `piper_sdk` methods such as `JointCtrl()` and
+`GripperCtrl()`.
 
 ## Why Send Decoded Joint Targets
 

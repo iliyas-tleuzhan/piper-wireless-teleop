@@ -3,8 +3,8 @@
 
 Run this on Computer 2, connected only to the slave Piper CAN bus. Movement is
 refused unless ``--confirm MOVE`` is passed. Incoming targets are checked for
-deadman, freshness, and shape, then commanded through ``piper_sdk`` with
-per-cycle slew limiting instead of freezing on large jumps.
+deadman, sequence ordering, and shape, then commanded through ``piper_sdk`` with
+per-cycle slew limiting as an internal safety fallback.
 """
 
 from __future__ import annotations
@@ -16,13 +16,12 @@ from pathlib import Path
 from piper_wireless_teleop.config import load_config
 from piper_wireless_teleop.logging_utils import RateLimitedPrinter
 from piper_wireless_teleop.packet import decode_packet
+from piper_wireless_teleop.receiver_state import SlavePacketTracker
 from piper_wireless_teleop.safety import (
     clamp_joints_raw,
     deg_to_raw,
     limit_step_raw,
-    packet_is_fresh,
     raw_to_deg,
-    validate_joint_packet,
 )
 from piper_wireless_teleop.slave_can_writer import PiperSlaveWriter
 from piper_wireless_teleop.udp_transport import UdpReceiver
@@ -40,6 +39,21 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def warn_if_receiver_timeout(
+    tracker: SlavePacketTracker,
+    status: RateLimitedPrinter,
+    receiver_timeout_s: float,
+) -> None:
+    """Print a rate-limited hold warning when valid packets stop arriving."""
+
+    now = time.monotonic()
+    if not tracker.timeout_expired(now, receiver_timeout_s):
+        return
+    idle_s = tracker.seconds_since_valid_packet(now)
+    idle_text = receiver_timeout_s if idle_s is None else idle_s
+    status.print(f"[SLAVE] No valid packets for {idle_text:.2f}s; holding last command")
+
+
 def main() -> None:
     """Run the UDP-to-Piper slave bridge."""
 
@@ -55,6 +69,7 @@ def main() -> None:
     receiver = UdpReceiver(args.bind_ip, udp_port, config.network.socket_timeout_s)
     writer = PiperSlaveWriter(can_interface, config.piper)
     status = RateLimitedPrinter(config.logging.status_hz)
+    tracker = SlavePacketTracker()
 
     print(f"[SLAVE] Listening on {args.bind_ip}:{udp_port}", flush=True)
     print(f"[SLAVE] Connecting to slave Piper on {can_interface}", flush=True)
@@ -64,30 +79,37 @@ def main() -> None:
     print("[SLAVE] Arm enabled and motion mode configured", flush=True)
 
     last_commanded_joints: list[int] | None = None
-    last_sequence: int | None = None
 
     try:
         while True:
             received = receiver.recv()
             if received is None:
+                warn_if_receiver_timeout(tracker, status, config.network.receiver_timeout_s)
                 continue
 
             data, address = received
+            # Receive time is measured on Computer 2 with a monotonic clock.
+            # Sender timestamps are not trusted for safety because the two
+            # computers may not have synchronized wall clocks.
+            receiver_time_s = time.monotonic()
             try:
                 packet = decode_packet(data)
-                target_joints = clamp_joints_raw(validate_joint_packet(packet))
             except (ValueError, TypeError) as exc:
                 status.print(f"[SLAVE] Ignoring malformed packet from {address[0]}: {exc}")
+                warn_if_receiver_timeout(tracker, status, config.network.receiver_timeout_s)
                 continue
 
-            if not packet["deadman"]:
-                status.print("[SLAVE] Ignoring packet because deadman=false")
+            decision = tracker.process_packet(packet, receiver_time_s)
+            if decision.warning:
+                status.print(f"[SLAVE] {decision.warning}")
+            if not decision.accepted:
+                status.print(f"[SLAVE] Ignoring packet from {address[0]}: {decision.reason}")
+                warn_if_receiver_timeout(tracker, status, config.network.receiver_timeout_s)
                 continue
 
-            timestamp = float(packet["timestamp"])
-            if not packet_is_fresh(timestamp, config.network.max_packet_age_s):
-                age_ms = (time.time() - timestamp) * 1000.0
-                status.print(f"[SLAVE] Ignoring stale packet age={age_ms:.1f}ms")
+            target_joints = decision.target_joints
+            if target_joints is None:
+                status.print(f"[SLAVE] Ignoring packet from {address[0]}: missing joints")
                 continue
 
             if last_commanded_joints is None:
@@ -111,16 +133,23 @@ def main() -> None:
                     }
                 )
 
-            sequence = packet.get("seq")
-            dropped = 0
-            if last_sequence is not None and isinstance(sequence, int):
-                dropped = max(0, sequence - last_sequence - 1)
-            if isinstance(sequence, int):
-                last_sequence = sequence
             last_commanded_joints = next_joints
+            command_rate_hz = tracker.command_rate_hz(time.monotonic())
+            command_rate_text = "unknown" if command_rate_hz is None else f"{command_rate_hz:.1f}Hz"
+
+            # This offset is a debug hint only. It is not used to accept or
+            # reject packets because Computer 1 and Computer 2 clocks may differ.
+            sender_offset_s = None
+            if decision.sender_timestamp is not None:
+                sender_offset_s = time.time() - decision.sender_timestamp
+            sender_offset_text = (
+                "n/a" if sender_offset_s is None else f"{sender_offset_s:+.3f}s"
+            )
 
             status.print(
-                f"[SLAVE] from={address[0]} seq={sequence} dropped={dropped} "
+                f"[SLAVE] from={address[0]} seq={decision.sequence} "
+                f"dropped={decision.dropped} total_dropped={decision.total_dropped} "
+                f"cmd_rate={command_rate_text} sender_offset_debug={sender_offset_text} "
                 f"target_deg={[round(raw_to_deg(value), 3) for value in target_joints]} "
                 f"cmd_deg={[round(raw_to_deg(value), 3) for value in next_joints]}"
             )

@@ -15,12 +15,22 @@ import yaml
 
 @dataclass(frozen=True)
 class NetworkConfig:
-    """UDP timing and freshness settings."""
+    """UDP timing and receiver-side timeout settings."""
 
     udp_port: int
     send_rate_hz: float
-    max_packet_age_s: float
+    receiver_timeout_s: float
     socket_timeout_s: float
+
+    @property
+    def max_packet_age_s(self) -> float:
+        """Backward-compatible alias for older config users.
+
+        New code should use ``receiver_timeout_s`` because the timeout is based
+        on receiver-side monotonic time, not sender wall-clock packet age.
+        """
+
+        return self.receiver_timeout_s
 
 
 @dataclass(frozen=True)
@@ -87,12 +97,18 @@ def load_config(path: str | Path) -> AppConfig:
     with config_path.open("r", encoding="utf-8") as handle:
         raw = yaml.safe_load(handle) or {}
 
+    network_raw = raw["network"]
+    receiver_timeout_s = network_raw.get(
+        "receiver_timeout_s",
+        network_raw.get("max_packet_age_s", 0.5),
+    )
+
     return AppConfig(
         network=NetworkConfig(
-            udp_port=int(raw["network"]["udp_port"]),
-            send_rate_hz=float(raw["network"]["send_rate_hz"]),
-            max_packet_age_s=float(raw["network"]["max_packet_age_s"]),
-            socket_timeout_s=float(raw["network"]["socket_timeout_s"]),
+            udp_port=int(network_raw["udp_port"]),
+            send_rate_hz=float(network_raw["send_rate_hz"]),
+            receiver_timeout_s=float(receiver_timeout_s),
+            socket_timeout_s=float(network_raw["socket_timeout_s"]),
         ),
         can=CanConfig(
             bitrate=int(raw["can"]["bitrate"]),

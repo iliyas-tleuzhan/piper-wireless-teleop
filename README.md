@@ -60,23 +60,23 @@ Start Computer 2 first. This side moves the slave arm and requires explicit
 confirmation:
 
 ```bash
-python scripts/slave_receiver.py --can can0 --confirm MOVE
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE
 ```
 
 Then start Computer 1:
 
 ```bash
-python scripts/master_sender.py --target-ip <COMPUTER_2_IP> --can can0 --deadman
+PYTHONPATH=. python scripts/master_sender.py --can can0 --target-ip <COMPUTER_2_IP> --deadman
 ```
 
 UDP-only test without Piper hardware:
 
 ```bash
 # Computer 2
-python scripts/test_udp.py receiver --bind-ip 0.0.0.0 --port 5005
+PYTHONPATH=. python scripts/test_udp.py receiver --bind-ip 0.0.0.0 --port 5005
 
 # Computer 1
-python scripts/test_udp.py sender --target-ip <COMPUTER_2_IP> --port 5005
+PYTHONPATH=. python scripts/test_udp.py sender --target-ip <COMPUTER_2_IP> --port 5005
 ```
 
 ## Safety Checklist
@@ -92,15 +92,17 @@ python scripts/test_udp.py sender --target-ip <COMPUTER_2_IP> --port 5005
 ## Configuration
 
 Defaults live in `configs/default.yaml`. Normal commands do not include `--speed`
-or `--max-jump-deg`; speed, follow mode, stale-packet age, status rate, and slew
-limit are config values.
+or `--max-jump-deg`; speed, follow mode, receiver timeout, status rate, and slew
+limit are config values. Sender packet timestamps are for debugging only. The
+slave uses receiver-side `time.monotonic()` and sequence numbers, so Computer 1
+and Computer 2 wall clocks do not need to be synchronized for timeout safety.
 
 Important defaults:
 
 - CAN bitrate: `1000000`
 - UDP port: `5005`
 - Master send rate: `50 Hz`
-- Max packet age: `0.25 s`
+- Receiver timeout: `0.5 s`
 - Piper speed percent: `100`
 - Follow/high-follow mode: `0xAD`
 - Slew limit: `3.0 degrees`
@@ -112,7 +114,7 @@ Important defaults:
 - `candump can0` shows nothing: check wiring, bitrate, termination, and power.
 - UDP packets not arriving: verify IP address, firewall, subnet, and port `5005`.
 - Slave not moving: confirm `--confirm MOVE`, `--deadman`, Piper enable state, and
-  that packets are not stale.
+  that valid packets are arriving before the receiver timeout.
 - Delayed movement: reduce Wi-Fi congestion, avoid verbose packet logging, and
   keep the control machines close to the access point.
 

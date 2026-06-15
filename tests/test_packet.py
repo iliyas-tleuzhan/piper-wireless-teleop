@@ -12,6 +12,7 @@ def test_packet_round_trip() -> None:
         deadman=True,
         joints_raw=[1000, 2000, -3000, 0, 500, -500],
         gripper={"angle": 1200, "effort": 1000, "code": 1},
+        mode_frame=[1, 1, 100, 173, 0, 0, 0, 0],
     )
 
     decoded = decode_packet(encode_packet(packet))
@@ -21,3 +22,5 @@ def test_packet_round_trip() -> None:
     assert decoded["joints"] == [1000, 2000, -3000, 0, 500, -500]
     assert decoded["joints_deg"] == [1.0, 2.0, -3.0, 0.0, 0.5, -0.5]
     assert decoded["gripper"] == {"angle": 1200, "effort": 1000, "code": 1}
+    assert decoded["timestamp"] == 123.5
+    assert decoded["mode_frame"] == [1, 1, 100, 173, 0, 0, 0, 0]

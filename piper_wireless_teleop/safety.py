@@ -2,12 +2,11 @@
 
 Piper joint targets are represented in raw units of 0.001 degrees. The helpers
 here clamp decoded targets to documented joint ranges, validate packet shape,
-check packet freshness, and slew-limit motion commands sent to the slave arm.
+and slew-limit motion commands sent to the slave arm.
 """
 
 from __future__ import annotations
 
-import time
 from collections.abc import Sequence
 
 RAW_UNITS_PER_DEGREE = 1000
@@ -61,13 +60,6 @@ def limit_step_raw(current: Sequence[int], target: Sequence[int], max_step_raw: 
             step = max_step_raw if delta > 0 else -max_step_raw
             next_joints.append(int(current_value) + step)
     return next_joints
-
-
-def packet_is_fresh(timestamp: float, max_age_s: float, now: float | None = None) -> bool:
-    """Return true when a packet timestamp is recent enough to command motion."""
-
-    current_time = time.time() if now is None else now
-    return 0.0 <= current_time - float(timestamp) <= max_age_s
 
 
 def validate_joints_raw(joints: Sequence[object]) -> None:

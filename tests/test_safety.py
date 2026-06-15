@@ -4,7 +4,6 @@ from piper_wireless_teleop.safety import (
     clamp_joints_raw,
     deg_to_raw,
     limit_step_raw,
-    packet_is_fresh,
     raw_to_deg,
 )
 
@@ -35,10 +34,8 @@ def test_slew_limiting() -> None:
     ]
 
 
-def test_units_and_freshness() -> None:
-    """Unit conversion and freshness checks are deterministic with injected time."""
+def test_units() -> None:
+    """Piper raw unit conversion is deterministic."""
 
     assert raw_to_deg(1250) == 1.25
     assert deg_to_raw(1.25) == 1250
-    assert packet_is_fresh(10.0, max_age_s=0.25, now=10.2)
-    assert not packet_is_fresh(10.0, max_age_s=0.25, now=10.3)

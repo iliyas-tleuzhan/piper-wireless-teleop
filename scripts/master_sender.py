@@ -76,6 +76,8 @@ def main() -> None:
                 next_send = now + send_interval_s
                 continue
 
+            # Sender wall-clock timestamp is kept only for log correlation. The
+            # slave uses receiver-side monotonic time for safety timeouts.
             timestamp = time.time()
             packet = make_packet(
                 sequence=sequence,
@@ -83,6 +85,7 @@ def main() -> None:
                 deadman=args.deadman,
                 joints_raw=state.joints_raw(),
                 gripper=state.gripper,
+                mode_frame=state.mode_frame,
             )
             sender.send(encode_packet(packet))
 

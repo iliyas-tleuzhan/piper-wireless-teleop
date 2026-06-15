@@ -20,7 +20,7 @@ Use `scripts/test_udp.py` before involving either robot.
 
 Confirm the slave command includes `--confirm MOVE`, the master command includes
 `--deadman`, `piper_sdk` is installed, CAN is configured, and the slave is not
-printing stale packet or deadman warnings.
+printing receiver-timeout or deadman warnings.
 
 ## Slave Movement Delayed
 
@@ -35,10 +35,24 @@ This can be normal if the latest master target stops changing. The master sender
 continues sending the latest target at a fixed rate so the slave holds the most
 recent commanded pose.
 
-## Packet Stale Warnings
+## Receiver Timeout Warnings
 
-Check clock behavior, network latency, Wi-Fi drops, and whether packets are being
-queued by a firewall or VPN. The default max packet age is `0.25 s`.
+If the slave prints `No valid packets ... holding last command`, valid UDP
+packets are not arriving before `network.receiver_timeout_s`. Check the target
+IP address, firewall, Wi-Fi quality, subnet, UDP port `5005`, and whether
+packets are malformed or missing `deadman=true`.
+
+This warning is no longer caused by Computer 1 and Computer 2 wall clocks being
+different. Sender timestamps are not used for safety-critical packet rejection.
+NTP is still useful for log comparison, but it is not required for teleoperation
+timeout behavior.
+
+## Duplicate or Out-of-Order Packets
+
+The slave ignores packets whose `seq` is less than or equal to the last accepted
+sequence number. If dropped packet counts rise, inspect Wi-Fi quality, network
+load, and whether multiple master senders are accidentally targeting the same
+slave receiver.
 
 ## Wrong IP Address
 
