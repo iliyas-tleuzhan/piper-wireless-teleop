@@ -1,0 +1,25 @@
+network:
+  udp_port: 5005
+  send_rate_hz: 50
+  max_packet_age_s: 0.25
+  socket_timeout_s: 0.02
+
+can:
+  bitrate: 1000000
+  interface: can0
+
+piper:
+  control_mode: 0x01
+  move_mode: 0x01
+  speed_percent: 100
+  follow_mode: 0xAD
+  gripper_default_effort: 1000
+
+safety:
+  max_step_deg: 3.0
+  startup_sync_required: true
+  startup_sync_tolerance_deg: 10.0
+
+logging:
+  status_hz: 2
+  verbose_packets: false

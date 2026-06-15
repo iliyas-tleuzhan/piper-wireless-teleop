@@ -1,0 +1,11 @@
+name: piper-wireless-teleop
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - pytest
+  - pyyaml
+  - pip:
+      - python-can
+      - piper_sdk
