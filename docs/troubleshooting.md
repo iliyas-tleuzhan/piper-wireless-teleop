@@ -85,9 +85,9 @@ whether your config explicitly sets `safety.enable_slew_limit: true`, whether
 the master is sending changing joint targets, and whether `deadman=true` packets
 are being accepted.
 
-Also check the configured hard bounds in `configs/default.yaml`. The default
-joint limits use the wider Piper motion envelope for normal teleop while keeping
-simple hard stops, and the gripper range is `0..100 mm`.
+Also check the local hard bounds in `piper_wireless_teleop/safety.py`. The
+default joint limits use the wider Piper motion envelope for normal teleop while
+keeping simple hard stops.
 
 ## Wrong IP Address
 

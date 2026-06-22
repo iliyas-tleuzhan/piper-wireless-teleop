@@ -44,10 +44,8 @@ from the previous target. The default path sends the latest valid target to
 
 The checked-in hard bounds are intentionally simple and wide enough for normal
 Piper master-slave teleop: J1 `-154..154`, J2 `0..195`, J3 `-175..0`, J4
-`-106..106`, J5 `-75..75`, and J6 `-120..120` degrees. Gripper commands are
-kept inside `0..100 mm` with effort clamped to `0..5000` raw units. When the
-installed `piper_sdk` exposes SDK-side limit setters, the slave writer applies
-the same configured bounds there too.
+`-106..106`, J5 `-75..75`, and J6 `-120..120` degrees. These are local clamps
+before sending the existing direct `JointCtrl()` command.
 
 An optional hidden fallback can be enabled with `safety.enable_slew_limit: true`
 and `safety.max_step_deg`, but the default is `false` because always limiting

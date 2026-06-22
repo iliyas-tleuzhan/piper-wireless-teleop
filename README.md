@@ -117,7 +117,6 @@ Important defaults:
 - Follow/high-follow mode: `0xAD`
 - Joint hard bounds: J1 `-154..154`, J2 `0..195`, J3 `-175..0`,
   J4 `-106..106`, J5 `-75..75`, J6 `-120..120` degrees
-- Gripper hard bounds: `0..100 mm`, effort `0..5000` raw units
 - Slew limiting: disabled by default
 
 ## Troubleshooting Summary

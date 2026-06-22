@@ -12,8 +12,6 @@ from typing import Any
 
 import yaml
 
-from .safety import GRIPPER_LIMITS_RAW, JOINT_LIMITS_RAW, raw_to_deg, raw_to_mm
-
 
 @dataclass(frozen=True)
 class NetworkConfig:
@@ -53,8 +51,6 @@ class PiperConfig:
     speed_percent: int
     follow_mode: int
     gripper_default_effort: int
-    joint_limits_deg: tuple[tuple[float, float], ...]
-    gripper_limits_mm: tuple[float, float]
 
 
 @dataclass(frozen=True)
@@ -96,39 +92,6 @@ def _parse_int(value: Any) -> int:
     raise TypeError(f"expected int-compatible value, got {type(value).__name__}")
 
 
-def _parse_joint_limits_deg(value: Any | None) -> tuple[tuple[float, float], ...]:
-    """Parse six joint limit pairs from config or fall back to safety defaults."""
-
-    if value is None:
-        return tuple((raw_to_deg(low), raw_to_deg(high)) for low, high in JOINT_LIMITS_RAW)
-    if not isinstance(value, list) or len(value) != 6:
-        raise ValueError("piper.joint_limits_deg must contain six [min, max] pairs")
-
-    parsed: list[tuple[float, float]] = []
-    for pair in value:
-        if not isinstance(pair, list) or len(pair) != 2:
-            raise ValueError("each piper.joint_limits_deg item must be [min, max]")
-        low, high = float(pair[0]), float(pair[1])
-        if low > high:
-            raise ValueError("piper.joint_limits_deg min must be <= max")
-        parsed.append((low, high))
-    return tuple(parsed)
-
-
-def _parse_gripper_limits_mm(value: Any | None) -> tuple[float, float]:
-    """Parse gripper range from config or fall back to safety defaults."""
-
-    if value is None:
-        low, high = GRIPPER_LIMITS_RAW
-        return raw_to_mm(low), raw_to_mm(high)
-    if not isinstance(value, list) or len(value) != 2:
-        raise ValueError("piper.gripper_limits_mm must be [min, max]")
-    low, high = float(value[0]), float(value[1])
-    if low > high:
-        raise ValueError("piper.gripper_limits_mm min must be <= max")
-    return low, high
-
-
 def load_config(path: str | Path) -> AppConfig:
     """Load an ``AppConfig`` from a YAML file."""
 
@@ -166,8 +129,6 @@ def load_config(path: str | Path) -> AppConfig:
             speed_percent=int(raw["piper"]["speed_percent"]),
             follow_mode=_parse_int(raw["piper"]["follow_mode"]),
             gripper_default_effort=int(raw["piper"]["gripper_default_effort"]),
-            joint_limits_deg=_parse_joint_limits_deg(raw["piper"].get("joint_limits_deg")),
-            gripper_limits_mm=_parse_gripper_limits_mm(raw["piper"].get("gripper_limits_mm")),
         ),
         safety=SafetyConfig(
             enable_slew_limit=bool(safety_raw.get("enable_slew_limit", False)),

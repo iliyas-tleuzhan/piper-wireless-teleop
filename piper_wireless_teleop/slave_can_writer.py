@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from math import radians
 from collections.abc import Sequence
 from typing import Any
 
 from .config import PiperConfig
-from .safety import clamp_gripper_command
 
 
 class PiperSlaveWriter:
@@ -23,18 +21,10 @@ class PiperSlaveWriter:
 
         from piper_sdk import C_PiperInterface_V2
 
-        try:
-            self._piper = C_PiperInterface_V2(
-                self.can_interface,
-                start_sdk_joint_limit=True,
-                start_sdk_gripper_limit=True,
-            )
-        except TypeError:
-            self._piper = C_PiperInterface_V2(self.can_interface)
+        self._piper = C_PiperInterface_V2(self.can_interface)
         connect = getattr(self._piper, "ConnectPort", None)
         if callable(connect):
             connect()
-        self.configure_sdk_limits()
 
     @property
     def piper(self) -> Any:
@@ -43,19 +33,6 @@ class PiperSlaveWriter:
         if self._piper is None:
             raise RuntimeError("Piper SDK is not connected")
         return self._piper
-
-    def configure_sdk_limits(self) -> None:
-        """Apply configured SDK-side soft limits when supported by piper_sdk."""
-
-        set_joint_limit = getattr(self.piper, "SetSDKJointLimitParam", None)
-        if callable(set_joint_limit):
-            for index, (low, high) in enumerate(self.piper_config.joint_limits_deg, start=1):
-                set_joint_limit(f"j{index}", radians(float(low)), radians(float(high)))
-
-        set_gripper_range = getattr(self.piper, "SetSDKGripperRangeParam", None)
-        if callable(set_gripper_range):
-            low, high = self.piper_config.gripper_limits_mm
-            set_gripper_range(float(low) / 1000.0, float(high) / 1000.0)
 
     def enable(self) -> None:
         """Enable the slave arm using whichever SDK method is available."""
@@ -103,10 +80,9 @@ class PiperSlaveWriter:
     def send_gripper(self, gripper: dict[str, int]) -> None:
         """Send a gripper command when the master packet includes one."""
 
-        command = clamp_gripper_command(gripper, self.piper_config.gripper_default_effort)
-        angle = command["angle"]
-        effort = command["effort"]
-        code = command["code"]
+        angle = int(gripper.get("angle", 0))
+        effort = int(gripper.get("effort", self.piper_config.gripper_default_effort))
+        code = int(gripper.get("code", 1))
         self.piper.GripperCtrl(angle, effort, code, 0)
 
     def read_joint_feedback(self) -> Any:

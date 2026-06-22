@@ -15,14 +15,6 @@ piper:
   speed_percent: 100
   follow_mode: 0xAD
   gripper_default_effort: 1000
-  joint_limits_deg:
-    - [-154, 154]
-    - [0, 195]
-    - [-175, 0]
-    - [-106, 106]
-    - [-75, 75]
-    - [-120, 120]
-  gripper_limits_mm: [0, 100]
 
 safety:
   enable_slew_limit: false
