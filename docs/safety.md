@@ -44,7 +44,7 @@ from the previous target. The default path sends the latest valid target to
 
 The checked-in hard bounds are intentionally simple and wide enough for normal
 Piper master-slave teleop: J1 `-154..154`, J2 `0..195`, J3 `-175..0`, J4
-`-106..106`, J5 `-75..75`, and J6 `-120..120` degrees. These are local clamps
+`-106..106`, J5 `-75..75`, and J6 `-100..100` degrees. These are local clamps
 before sending the existing direct `JointCtrl()` command.
 
 An optional hidden fallback can be enabled with `safety.enable_slew_limit: true`

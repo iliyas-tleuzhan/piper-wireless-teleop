@@ -18,7 +18,7 @@ def safety_config(enable_slew_limit: bool) -> SafetyConfig:
 def test_default_command_path_passes_latest_target_directly() -> None:
     """Large normal target changes are not artificially slowed by default."""
 
-    target = [150000, 180000, -170000, 100000, 70000, -120000]
+    target = [150000, 180000, -170000, 100000, 70000, -100000]
 
     assert choose_command_joints(
         last_commanded_joints=[0, 0, 0, 0, 0, 0],

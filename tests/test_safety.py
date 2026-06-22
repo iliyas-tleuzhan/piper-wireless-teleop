@@ -17,7 +17,7 @@ def test_joint_clamping() -> None:
         -175000,
         106000,
         -75000,
-        120000,
+        100000,
     ]
 
 def test_slew_limiting() -> None:
