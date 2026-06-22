@@ -4,14 +4,17 @@
 
 1. Wire Computer 1 only to the master Piper.
 2. Wire Computer 2 only to the slave Piper.
-3. Configure CAN on both computers.
-4. Start the slave receiver on Computer 2.
-5. Start the master sender on Computer 1.
+3. Power-cycle the slave Piper fresh before important tests.
+4. Configure CAN on both computers and check `can0`.
+5. Run a slave small-move test.
+6. Start the slave receiver on Computer 2.
+7. Start the master sender on Computer 1.
+8. Move slowly first.
 
 ## Computer 2: Slave Receiver
 
 ```bash
-PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE
 ```
 
 Optional overrides:

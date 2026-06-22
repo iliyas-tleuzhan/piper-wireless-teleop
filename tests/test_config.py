@@ -14,3 +14,12 @@ def test_default_config_commands_directly() -> None:
     assert not config.safety.startup_sync_required
     assert config.piper.speed_percent == 100
     assert config.piper.follow_mode == 0xAD
+    assert config.piper.joint_limits_deg == (
+        (-154.0, 154.0),
+        (0.0, 195.0),
+        (-175.0, 0.0),
+        (-106.0, 106.0),
+        (-75.0, 75.0),
+        (-120.0, 120.0),
+    )
+    assert config.piper.gripper_limits_mm == (0.0, 100.0)

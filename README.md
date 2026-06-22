@@ -60,7 +60,7 @@ Start Computer 2 first. This side moves the slave arm and requires explicit
 confirmation:
 
 ```bash
-PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE
 ```
 
 Then start Computer 1:
@@ -82,11 +82,15 @@ PYTHONPATH=. python scripts/test_udp.py sender --target-ip <COMPUTER_2_IP> --por
 ## Safety Checklist
 
 - Keep the slave arm power cutoff or E-stop within reach.
+- Power-cycle the slave Piper fresh before important tests.
 - Start with both arms in similar poses.
 - Confirm the master and slave are not on the same CAN bus.
 - Test UDP before enabling robot movement.
-- Test each CAN bus with `candump can0`.
-- Run the slave receiver first, then the master sender.
+- Check `can0` with `ip -details link show can0` and `candump can0`.
+- Run `PYTHONPATH=. python scripts/test_slave_small_move.py --can can0 --confirm MOVE`.
+- Start `PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE`.
+- Start `PYTHONPATH=. python scripts/master_sender.py --can can0 --target-ip <COMPUTER_2_IP> --deadman`.
+- Move slowly first.
 - Use `--deadman` on the master sender; packets with `deadman=false` are ignored.
 
 ## Configuration
@@ -111,6 +115,9 @@ Important defaults:
 - Status output: `2 Hz`
 - Piper speed percent: `100`
 - Follow/high-follow mode: `0xAD`
+- Joint hard bounds: J1 `-154..154`, J2 `0..195`, J3 `-175..0`,
+  J4 `-106..106`, J5 `-75..75`, J6 `-120..120` degrees
+- Gripper hard bounds: `0..100 mm`, effort `0..5000` raw units
 - Slew limiting: disabled by default
 
 ## Troubleshooting Summary
@@ -120,6 +127,10 @@ Important defaults:
 - UDP packets not arriving: verify IP address, firewall, subnet, and port `5005`.
 - Slave not moving: confirm `--confirm MOVE`, `--deadman`, Piper enable state, and
   that valid packets are arriving before the receiver timeout.
+- Gripper moves but joints do not: the slave Piper controller may be stuck in a
+  stale hold/control/motion-mode state. Stop `slave_receiver.py`, run
+  `slave_release.py`, restart `slave_receiver.py`, then power-cycle the slave arm
+  if joints still ignore commands.
 - Negative packet age: no longer a safety error; sender timestamps are debug-only.
 - Delayed movement: reduce Wi-Fi congestion, avoid verbose packet logging, and
   keep the control machines close to the access point.

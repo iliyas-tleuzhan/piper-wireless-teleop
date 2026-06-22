@@ -10,15 +10,19 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 RAW_UNITS_PER_DEGREE = 1000
+RAW_UNITS_PER_MM = 1000
 
 JOINT_LIMITS_RAW: tuple[tuple[int, int], ...] = (
-    (-150000, 150000),
-    (0, 180000),
-    (-170000, 0),
-    (-100000, 100000),
-    (-70000, 70000),
+    (-154000, 154000),
+    (0, 195000),
+    (-175000, 0),
+    (-106000, 106000),
+    (-75000, 75000),
     (-120000, 120000),
 )
+GRIPPER_LIMITS_RAW = (0, 100000)
+GRIPPER_EFFORT_LIMITS_RAW = (0, 5000)
+GRIPPER_CODES = {0, 1, 2, 3}
 
 
 def raw_to_deg(value: int | float) -> float:
@@ -33,6 +37,18 @@ def deg_to_raw(value: int | float) -> int:
     return int(round(float(value) * RAW_UNITS_PER_DEGREE))
 
 
+def raw_to_mm(value: int | float) -> float:
+    """Convert Piper raw gripper units to millimeters."""
+
+    return float(value) / RAW_UNITS_PER_MM
+
+
+def mm_to_raw(value: int | float) -> int:
+    """Convert millimeters to Piper raw gripper units."""
+
+    return int(round(float(value) * RAW_UNITS_PER_MM))
+
+
 def clamp_joints_raw(joints: Sequence[int]) -> list[int]:
     """Clamp six raw joint targets to Piper joint limits."""
 
@@ -41,6 +57,19 @@ def clamp_joints_raw(joints: Sequence[int]) -> list[int]:
     for value, (low, high) in zip(joints, JOINT_LIMITS_RAW, strict=True):
         clamped.append(max(low, min(high, int(value))))
     return clamped
+
+
+def clamp_gripper_command(gripper: dict[str, int], default_effort: int) -> dict[str, int]:
+    """Clamp a gripper command to the normal Piper range."""
+
+    angle_low, angle_high = GRIPPER_LIMITS_RAW
+    effort_low, effort_high = GRIPPER_EFFORT_LIMITS_RAW
+    angle = max(angle_low, min(angle_high, int(gripper.get("angle", 0))))
+    effort = max(effort_low, min(effort_high, int(gripper.get("effort", default_effort))))
+    code = int(gripper.get("code", 1))
+    if code not in GRIPPER_CODES:
+        code = 1
+    return {"angle": angle, "effort": effort, "code": code}
 
 
 def limit_step_raw(current: Sequence[int], target: Sequence[int], max_step_raw: int) -> list[int]:

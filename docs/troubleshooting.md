@@ -22,6 +22,26 @@ Confirm the slave command includes `--confirm MOVE`, the master command includes
 `--deadman`, `piper_sdk` is installed, CAN is configured, and the slave is not
 printing receiver-timeout or deadman warnings.
 
+## Packets Arrive, Gripper Moves, Joints Do Not
+
+Symptom: packets arrive, `target_deg` and `cmd_deg` change, and the gripper
+moves, but the slave joints do not move.
+
+Likely cause: the slave Piper controller may be stuck in a stale
+hold/control/motion-mode state. `GripperCtrl()` can still work while
+`JointCtrl()` is ignored.
+
+Recovery:
+
+1. Stop `slave_receiver.py`.
+2. Run `PYTHONPATH=. python slave_release.py`.
+3. Restart `slave_receiver.py`.
+4. If joints still do not move, fully power-cycle/unplug/replug the slave Piper
+   arm.
+5. Bring `can0` back up if needed.
+6. Run `PYTHONPATH=. python scripts/test_slave_small_move.py --can can0 --confirm MOVE`.
+7. Then run full teleop again.
+
 ## Slave Movement Delayed
 
 Disable verbose packet logging, check Wi-Fi quality, reduce network congestion,
@@ -64,6 +84,10 @@ Slew limiting is disabled by default. If the slave still barely moves, check
 whether your config explicitly sets `safety.enable_slew_limit: true`, whether
 the master is sending changing joint targets, and whether `deadman=true` packets
 are being accepted.
+
+Also check the configured hard bounds in `configs/default.yaml`. The default
+joint limits use the wider Piper motion envelope for normal teleop while keeping
+simple hard stops, and the gripper range is `0..100 mm`.
 
 ## Wrong IP Address
 
