@@ -49,6 +49,34 @@ PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE --init-m
 `slave_start + (master_current - master_start)`. `none` is the old direct
 behavior and can jump at startup.
 
+## `scripts/no_gripper_master.py`
+
+Runs on Computer 1. Reads master Piper joint command frames and sends UDP
+packets without gripper targets.
+
+Moves robot: no, but it sends motion targets.
+
+```bash
+PYTHONPATH=. python scripts/no_gripper_master.py --can can0 --target-ip <COMPUTER_2_IP> --deadman
+```
+
+## `scripts/no_gripper_slave.py`
+
+Runs on Computer 2. Receives UDP packets and commands only the slave arm joints;
+incoming or absent gripper targets are ignored.
+
+Moves robot: yes. Requires `--confirm MOVE`.
+
+```bash
+PYTHONPATH=. python scripts/no_gripper_slave.py --can can0 --confirm MOVE
+```
+
+This script uses the same default `--init-mode align` startup as
+`scripts/slave_receiver.py`: it waits for a valid master packet, checks
+master/slave startup pose differences against the 8 degree threshold, and only
+slowly corrects the slave after the operator types `ALIGN`. `--init-mode offset`
+and `--init-mode none` are also available.
+
 ## `scripts/decode_master_can.py`
 
 Runs on Computer 1. Prints decoded master joint and gripper command frames.

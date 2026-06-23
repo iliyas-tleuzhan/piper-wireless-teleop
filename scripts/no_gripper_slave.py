@@ -29,6 +29,7 @@ from piper_wireless_teleop.safety import (
 )
 from piper_wireless_teleop.slave_can_writer import PiperSlaveWriter
 from piper_wireless_teleop.udp_transport import UdpReceiver
+from scripts.slave_receiver import apply_offset_command, initialize_teleop
 
 
 def parse_args() -> argparse.Namespace:
@@ -40,6 +41,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bind-ip", default="0.0.0.0", help="UDP bind address")
     parser.add_argument("--udp-port", type=int, default=None, help="UDP listen port")
     parser.add_argument("--confirm", default="", help="Must be MOVE to allow robot motion")
+    parser.add_argument(
+        "--init-mode",
+        choices=("align", "offset", "none"),
+        default="align",
+        help=(
+            "Startup safety mode. align prompts and slowly corrects the slave before teleop; "
+            "offset keeps slave_start + master_delta; none uses old direct behavior."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -102,9 +112,17 @@ def main() -> None:
     writer.set_motion_mode()
     print("[SLAVE] Arm enabled and motion mode configured", flush=True)
 
-    last_commanded_joints: list[int] | None = None
-
     try:
+        startup = initialize_teleop(
+            init_mode=args.init_mode,
+            receiver=receiver,
+            writer=writer,
+            tracker=tracker,
+            status=status,
+            receiver_timeout_s=config.network.receiver_timeout_s,
+        )
+        last_commanded_joints: list[int] | None = None
+
         while True:
             received = receiver.recv()
             if received is None:
@@ -139,9 +157,19 @@ def main() -> None:
                 status.print(f"[SLAVE] Ignoring packet from {address[0]}: missing joints")
                 continue
 
+            command_target_joints = target_joints
+            if startup.mode == "offset":
+                if startup.master_start is None or startup.slave_start is None:
+                    raise RuntimeError("offset startup missing master/slave start poses")
+                command_target_joints = apply_offset_command(
+                    master_current=target_joints,
+                    master_start=startup.master_start,
+                    slave_start=startup.slave_start,
+                )
+
             next_joints = choose_command_joints(
                 last_commanded_joints=last_commanded_joints,
-                target_joints=target_joints,
+                target_joints=command_target_joints,
                 safety_config=config.safety,
             )
             writer.send_joints(next_joints)
