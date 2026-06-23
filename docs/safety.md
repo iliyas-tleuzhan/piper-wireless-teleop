@@ -40,11 +40,11 @@ count dropped packets. Sequence numbers are not used to estimate elapsed time.
 
 `--init-mode align` is the default startup mode. The receiver first connects to
 and enables the slave Piper using the same joint control/high-follow setup as
-normal teleop. It then waits for a valid master packet but does not command the
-slave yet.
+normal teleop. It does not command the slave while the operator is positioning
+the arms.
 
 The operator must visually place the master and slave arms in the same safe
-starting pose and press Enter. The receiver then compares the latest master
+starting pose and press Enter. The receiver then silently compares the current master
 joint target with stable slave feedback from `GetArmJointMsgs()`. Both values
 are official Piper raw joint units of 0.001 degrees. Initial/default all-zero
 feedback frames are discarded before the comparison.
@@ -54,8 +54,7 @@ check. Every joint must be within 15 degrees. If any joint is farther away, the
 receiver prints the joint number and the difference, and asks the operator to
 adjust both arms again.
 
-When the numeric check passes, the slave still does not move automatically. The
-operator presses Enter; then only the slave arm is slowly corrected from its
+When the numeric check passes, only the slave arm is slowly corrected from its
 current feedback pose to the confirmed `master_start` pose using 0.3 degree
 steps every 20 ms. Ctrl+C stops the process, and the alignment motion times out
 after 10 seconds. Gripper commands are not sent until normal teleop starts.

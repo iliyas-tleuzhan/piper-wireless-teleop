@@ -103,12 +103,6 @@ def choose_command_joints(
     return clamp_joints_raw(limit_step_raw(last_commanded_joints, target_joints, max_step_raw))
 
 
-def format_joint_degrees(joints_raw: Sequence[int]) -> list[float]:
-    """Return rounded degree values for status output."""
-
-    return [round(raw_to_deg(value), 3) for value in joints_raw]
-
-
 def apply_offset_command(
     *,
     master_current: Sequence[int],
@@ -205,20 +199,16 @@ def is_default_zero_feedback(joints_raw: Sequence[int]) -> bool:
 def read_stable_slave_feedback(writer: PiperSlaveWriter) -> list[int]:
     """Read recent slave feedback, ignoring initial/default all-zero frames."""
 
-    print("[SLAVE] Reading stable slave joint feedback", flush=True)
     latest: list[int] | None = None
     sample_started_s: float | None = None
-    status = RateLimitedPrinter(2.0)
 
     while True:
         feedback = writer.read_joint_feedback()
         joints = extract_feedback_joints_raw(feedback)
         if joints is None:
-            status.print(f"[SLAVE] Waiting for parseable slave joint feedback: {feedback}")
             time.sleep(ALIGN_TICK_S)
             continue
         if is_default_zero_feedback(joints):
-            status.print("[SLAVE] Discarding initial/default all-zero slave feedback")
             time.sleep(ALIGN_TICK_S)
             continue
 
@@ -235,51 +225,36 @@ def wait_for_valid_master_packet(
     *,
     receiver: UdpReceiver,
     tracker: SlavePacketTracker,
-    status: RateLimitedPrinter,
-    receiver_timeout_s: float,
-    purpose: str,
 ) -> list[int]:
     """Wait for the next valid master packet without commanding the slave."""
 
-    status.print(f"[SLAVE] Waiting for valid master packet for {purpose}; slave is not moving")
     while True:
         received = receiver.recv()
         if received is None:
-            warn_if_receiver_timeout(tracker, status, receiver_timeout_s)
-            status.print(f"[SLAVE] Still waiting for master packet for {purpose}; slave is not moving")
             continue
 
-        data, address = received
+        data, _address = received
         receiver_time_s = time.monotonic()
         try:
             packet = decode_packet(data)
-        except (ValueError, TypeError) as exc:
-            status.print(f"[SLAVE] Ignoring malformed packet from {address[0]} during init: {exc}")
+        except (ValueError, TypeError):
             continue
 
         decision = tracker.process_packet(packet, receiver_time_s)
-        if decision.warning:
-            status.print(f"[SLAVE] {decision.warning}")
         if not decision.accepted:
-            status.print(f"[SLAVE] Ignoring packet from {address[0]} during init: {decision.reason}")
             continue
         if decision.target_joints is None:
-            status.print(f"[SLAVE] Ignoring packet from {address[0]} during init: missing joints")
             continue
         return decision.target_joints
 
 
-def print_start_alignment(master_start: Sequence[int], slave_start: Sequence[int]) -> list[float]:
-    """Print startup raw/degree poses and return per-joint degree differences."""
+def calculate_alignment_diffs(master_start: Sequence[int], slave_start: Sequence[int]) -> list[float]:
+    """Return per-joint startup degree differences."""
 
-    diffs_deg = [
+    return [
         raw_to_deg(int(master_value) - int(slave_value))
         for master_value, slave_value in zip(master_start, slave_start, strict=True)
     ]
-    print(f"[SLAVE] master_start raw={list(master_start)} deg={format_joint_degrees(master_start)}", flush=True)
-    print(f"[SLAVE] slave_start  raw={list(slave_start)} deg={format_joint_degrees(slave_start)}", flush=True)
-    print(f"[SLAVE] difference deg={[round(value, 3) for value in diffs_deg]}", flush=True)
-    return diffs_deg
 
 
 def report_alignment_errors(diffs_deg: Sequence[float]) -> bool:
@@ -315,13 +290,6 @@ def slowly_align_slave_to_master_start(
     max_step_raw = deg_to_raw(ALIGN_STEP_DEG)
     close_raw = deg_to_raw(0.5)
     start_s = time.monotonic()
-    next_progress_s = start_s
-
-    print(
-        f"[SLAVE] Slowly aligning slave: max {ALIGN_STEP_DEG:.1f} deg every "
-        f"{ALIGN_TICK_S * 1000:.0f} ms, timeout {ALIGN_TIMEOUT_S:.0f}s",
-        flush=True,
-    )
 
     while True:
         now_s = time.monotonic()
@@ -341,13 +309,6 @@ def slowly_align_slave_to_master_start(
 
         commanded = clamp_joints_raw(limit_step_raw(commanded, target, max_step_raw))
         writer.send_joints(commanded)
-        if now_s >= next_progress_s:
-            print(
-                f"[SLAVE] alignment progress cmd_deg={format_joint_degrees(commanded)} "
-                f"max_error_deg={max_error_deg:.3f}",
-                flush=True,
-            )
-            next_progress_s = now_s + 0.5
         time.sleep(ALIGN_TICK_S)
 
 
@@ -357,8 +318,6 @@ def initialize_teleop(
     receiver: UdpReceiver,
     writer: PiperSlaveWriter,
     tracker: SlavePacketTracker,
-    status: RateLimitedPrinter,
-    receiver_timeout_s: float,
 ) -> StartupInit:
     """Run the selected startup initialization before normal teleop."""
 
@@ -370,15 +329,6 @@ def initialize_teleop(
         )
         return StartupInit(mode="none")
 
-    wait_for_valid_master_packet(
-        receiver=receiver,
-        tracker=tracker,
-        status=status,
-        receiver_timeout_s=receiver_timeout_s,
-        purpose="startup",
-    )
-    print("[SLAVE] First valid master packet received. No slave motion has been commanded.", flush=True)
-
     while True:
         input(
             "Move both master and slave arms to the same safe visual starting pose. "
@@ -387,12 +337,9 @@ def initialize_teleop(
         master_start = wait_for_valid_master_packet(
             receiver=receiver,
             tracker=tracker,
-            status=status,
-            receiver_timeout_s=receiver_timeout_s,
-            purpose="alignment check",
         )
         slave_start = read_stable_slave_feedback(writer)
-        diffs_deg = print_start_alignment(master_start, slave_start)
+        diffs_deg = calculate_alignment_diffs(master_start, slave_start)
         if not report_alignment_errors(diffs_deg):
             continue
 
@@ -404,14 +351,12 @@ def initialize_teleop(
             )
             return StartupInit(mode="offset", master_start=master_start, slave_start=slave_start)
 
-        input("Press Enter to slowly move the slave to the master_start pose.")
         if slowly_align_slave_to_master_start(
             writer=writer,
             slave_start=slave_start,
             master_start=master_start,
         ):
             return StartupInit(mode="align", master_start=master_start, slave_start=slave_start)
-        print("[SLAVE] Rechecking alignment before teleop.", flush=True)
 
 
 def main() -> None:
@@ -443,8 +388,6 @@ def main() -> None:
             receiver=receiver,
             writer=writer,
             tracker=tracker,
-            status=status,
-            receiver_timeout_s=config.network.receiver_timeout_s,
         )
         last_commanded_joints: list[int] | None = None
 

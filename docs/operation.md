@@ -21,20 +21,16 @@ PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --con
 
 1. The receiver connects to the slave Piper, enables it, and sets the configured
    joint control/high-follow mode.
-2. It waits for the first valid master packet but does not command the slave to
-   that pose.
-3. It prompts: `Move both master and slave arms to the same safe visual starting
+2. It prompts: `Move both master and slave arms to the same safe visual starting
    pose. Press Enter when ready.`
-4. After Enter, it reads the latest master target and about 0.5 seconds of
+3. After Enter, it silently reads the current master target and about 0.5 seconds of
    stable slave feedback from `GetArmJointMsgs()`, discarding initial/default
    all-zero feedback frames.
-5. It prints `master_start`, `slave_start`, and per-joint differences in raw
-   units and degrees.
-6. Any joint more than 15 degrees apart is rejected and the prompt repeats.
-7. If the check passes, the receiver asks you to press Enter. Only then does it
-   slowly move the slave from its feedback pose to `master_start` using small
-   0.3 degree steps every 20 ms.
-8. Normal absolute teleop starts after the slave is close to `master_start`.
+4. Any joint more than 15 degrees apart is printed, rejected, and the prompt
+   repeats.
+5. If the check passes, it slowly moves the slave from its feedback pose to
+   `master_start` using small 0.3 degree steps every 20 ms.
+6. Normal absolute teleop starts after the slave is close to `master_start`.
 
 Visual alignment is the human check that both arms look like they are in the
 same safe pose. CAN/raw alignment is the numeric check that master target values

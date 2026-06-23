@@ -57,9 +57,10 @@ ip -details link show can0
 ## Quick Start
 
 Start Computer 2 first. This side moves the slave arm and requires explicit
-confirmation. The default `--init-mode align` waits for a master packet, asks
-you to visually place both arms in the same safe starting pose, checks CAN/raw
-joint feedback, and only moves the slave slowly after you press Enter:
+confirmation. The default `--init-mode align` asks you to visually place both
+arms in the same safe starting pose, checks current master target and slave
+feedback after you press Enter, and then slowly aligns the slave if the check
+passes:
 
 ```bash
 PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE
@@ -112,11 +113,10 @@ means the operator places both arms in the same safe pose by sight; CAN/raw
 alignment means every joint is within the 15 degree startup threshold. If a joint
 is farther away, the receiver prints the joint and asks you to adjust again.
 
-After the check passes, the receiver asks you to press Enter. Only then does it
-slowly correct the slave from its current feedback pose to `master_start` with
-small 0.3 degree steps every 20 ms. Gripper commands are ignored until normal
-teleop starts. `--init-mode offset` is available as a fallback when you do not
-want the slave corrected at startup; it commands
+After the check passes, the receiver slowly corrects the slave from its current
+feedback pose to `master_start` with small 0.3 degree steps every 20 ms. Gripper
+commands are ignored until normal teleop starts. `--init-mode offset` is
+available as a fallback when you do not want the slave corrected at startup; it commands
 `slave_start + (master_current - master_start)` during teleop. `--init-mode none`
 keeps the old direct startup behavior and prints a warning because the slave can
 jump to the master pose.

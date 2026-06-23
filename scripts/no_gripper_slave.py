@@ -118,8 +118,6 @@ def main() -> None:
             receiver=receiver,
             writer=writer,
             tracker=tracker,
-            status=status,
-            receiver_timeout_s=config.network.receiver_timeout_s,
         )
         last_commanded_joints: list[int] | None = None
 
