@@ -17,18 +17,17 @@
 PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE
 ```
 
-`--init-mode align` is the default. Startup is intentionally interactive:
+`--init-mode align` is the default. Startup automatically waits for close poses:
 
 1. The receiver connects to the slave Piper, enables it, and sets the configured
    joint control/high-follow mode.
-2. It prompts: `Move both master and slave arms to the same safe visual starting
-   pose. Press Enter when ready.`
-3. After Enter, it silently samples current master packets for about 0.5 seconds
+2. The operator visually moves both arms into the same safe starting pose.
+3. The receiver silently samples current master packets for about 0.5 seconds
    and uses the latest one, then reads about 0.5 seconds of stable slave
    feedback from `GetArmJointMsgs()`, discarding initial/default all-zero
    feedback frames.
-4. Any joint more than 15 degrees apart is printed, rejected, and the prompt
-   repeats.
+4. If any joint is more than 15 degrees apart, initialization stays silent and
+   keeps checking current master/current slave positions.
 5. If the check passes, it slowly moves the slave from its current feedback pose
    to the sampled current master pose using small 0.3 degree steps every 20 ms.
 6. Normal absolute teleop starts after the slave is close to that sampled

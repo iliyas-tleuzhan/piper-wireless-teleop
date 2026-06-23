@@ -57,10 +57,9 @@ ip -details link show can0
 ## Quick Start
 
 Start Computer 2 first. This side moves the slave arm and requires explicit
-confirmation. The default `--init-mode align` asks you to visually place both
-arms in the same safe starting pose, samples the current master target and
-current slave feedback after you press Enter, and then slowly aligns the slave
-if the check passes:
+confirmation. The default `--init-mode align` silently waits until the current
+master target and current slave feedback are visually/CAN aligned, then slowly
+aligns the slave before teleop starts:
 
 ```bash
 PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE
@@ -88,7 +87,7 @@ PYTHONPATH=. python scripts/test_udp.py sender --target-ip <COMPUTER_2_IP> --por
 - Power-cycle the slave Piper fresh before important tests.
 - Start with both arms in similar poses.
 - Use the default safe alignment startup. The slave will not move toward the
-  master pose until the visual/CAN alignment check passes and you press Enter.
+  master pose until the visual/CAN alignment check passes.
 - Confirm the master and slave are not on the same CAN bus.
 - Test UDP before enabling robot movement.
 - Check `can0` with `ip -details link show can0` and `candump can0`.
@@ -108,12 +107,12 @@ Computer 2 wall clocks do not need to be synchronized for timeout safety.
 
 Wireless teleop starts in `--init-mode align` by default. During startup, the
 receiver compares the latest master joint target with stable slave feedback from
-`GetArmJointMsgs()`. The master target is sampled silently after Enter so queued
-UDP packets from before Enter are skipped. Both values are Piper raw units of
-0.001 degrees. Visual alignment means the operator places both arms in the same
-safe pose by sight; CAN/raw alignment means every joint is within the 15 degree
-startup threshold. If a joint is farther away, the receiver prints the joint and
-asks you to adjust again.
+`GetArmJointMsgs()`. The master target is sampled silently in short windows so
+queued UDP packets are skipped. Both values are Piper raw units of 0.001 degrees.
+Visual alignment means the operator places both arms in the same safe pose by
+sight; CAN/raw alignment means every joint is within the 15 degree startup
+threshold. If a joint is farther away, the receiver stays in initialization and
+continues checking silently.
 
 After the check passes, the receiver slowly corrects the slave from its current
 feedback pose to the sampled current master pose with small 0.3 degree steps every 20 ms. Gripper

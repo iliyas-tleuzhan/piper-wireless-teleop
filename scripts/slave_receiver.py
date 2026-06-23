@@ -61,7 +61,7 @@ def parse_args() -> argparse.Namespace:
         choices=("align", "offset", "none"),
         default="align",
         help=(
-            "Startup safety mode. align prompts and slowly corrects the slave before teleop; "
+            "Startup safety mode. align silently waits for close poses and corrects the slave; "
             "offset keeps slave_init_current + current master delta; none skips correction."
         ),
     )
@@ -227,7 +227,7 @@ def read_current_master_packet(
     receiver: UdpReceiver,
     tracker: SlavePacketTracker,
 ) -> list[int]:
-    """Read the latest valid master packet after Enter, skipping queued packets."""
+    """Read the latest valid master packet from a short current-position sample."""
 
     latest: list[int] | None = None
     sample_started_s: float | None = None
@@ -274,24 +274,10 @@ def calculate_alignment_diffs(
     ]
 
 
-def report_alignment_errors(diffs_deg: Sequence[float]) -> bool:
-    """Print out-of-threshold joints and return whether startup is acceptable."""
+def alignment_within_threshold(diffs_deg: Sequence[float]) -> bool:
+    """Return whether every startup joint difference is within threshold."""
 
-    too_far = [
-        (index, diff)
-        for index, diff in enumerate(diffs_deg, start=1)
-        if abs(diff) > ALIGN_THRESHOLD_DEG
-    ]
-    if not too_far:
-        return True
-    for index, diff in too_far:
-        print(
-            f"[SLAVE] J{index} is too far from master: {diff:+.3f} deg "
-            f"(limit {ALIGN_THRESHOLD_DEG:.1f} deg)",
-            flush=True,
-        )
-    print("[SLAVE] Adjust both arms to the same safe visual starting pose and try again", flush=True)
-    return False
+    return all(abs(diff) <= ALIGN_THRESHOLD_DEG for diff in diffs_deg)
 
 
 def slowly_align_slave_to_master_current(
@@ -311,17 +297,10 @@ def slowly_align_slave_to_master_current(
     while True:
         now_s = time.monotonic()
         error_raw = [int(target_value) - int(commanded_value) for target_value, commanded_value in zip(target, commanded, strict=True)]
-        max_error_deg = max(abs(raw_to_deg(value)) for value in error_raw)
         if max(abs(value) for value in error_raw) <= close_raw:
             writer.send_joints(target)
-            print("[SLAVE] Alignment complete; starting normal teleop", flush=True)
             return True
         if now_s - start_s > ALIGN_TIMEOUT_S:
-            print(
-                f"[SLAVE] Alignment timed out with max remaining error {max_error_deg:.3f} deg; "
-                "slave was not switched to teleop",
-                flush=True,
-            )
             return False
 
         commanded = clamp_joints_raw(limit_step_raw(commanded, target, max_step_raw))
@@ -339,33 +318,20 @@ def initialize_teleop(
     """Run the selected startup initialization before normal teleop."""
 
     while True:
-        input(
-            "Move both master and slave arms to the same safe visual starting pose. "
-            "Press Enter when ready."
-        )
         master_current = read_current_master_packet(
             receiver=receiver,
             tracker=tracker,
         )
         slave_current = read_stable_slave_feedback(writer)
         diffs_deg = calculate_alignment_diffs(master_current, slave_current)
-        if not report_alignment_errors(diffs_deg):
+        if not alignment_within_threshold(diffs_deg):
+            time.sleep(ALIGN_TICK_S)
             continue
 
         if init_mode == "none":
-            print(
-                "[SLAVE] WARNING: --init-mode none skips slave alignment correction. "
-                "Normal teleop will start from the current checked pose.",
-                flush=True,
-            )
             return StartupInit(mode="none")
 
         if init_mode == "offset":
-            print(
-                "[SLAVE] Offset init accepted. Teleop will command "
-                "slave_init_current + (master_current - master_init_current).",
-                flush=True,
-            )
             return StartupInit(
                 mode="offset",
                 master_init_current=master_current,

@@ -32,12 +32,11 @@ Moves robot: yes. Requires `--confirm MOVE`.
 PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE
 ```
 
-Default startup mode is `--init-mode align`. It prompts the operator to place
-both arms in the same safe visual starting pose, silently samples the current
-master target after Enter, compares it against current slave feedback, prints
-only joints that are more than 15 degrees apart, and slowly moves the slave to
-the sampled current master pose when the check passes. The gripper is ignored
-until teleop starts.
+Default startup mode is `--init-mode align`. It silently samples the current
+master target and current slave feedback while the operator visually moves both
+arms into the same safe pose. When every joint is within 15 degrees, it slowly
+moves the slave to the sampled current master pose and starts teleop. The
+gripper is ignored until teleop starts.
 
 Other modes:
 
@@ -73,10 +72,9 @@ PYTHONPATH=. python scripts/no_gripper_slave.py --can can0 --confirm MOVE
 ```
 
 This script uses the same default `--init-mode align` startup as
-`scripts/slave_receiver.py`: it prompts the operator, silently checks current
-master/slave pose differences against the 15 degree threshold after Enter, and
-slowly corrects the slave to the sampled current master pose when the check
-passes. `--init-mode offset` and
+`scripts/slave_receiver.py`: it silently checks current master/slave pose
+differences against the 15 degree threshold and slowly corrects the slave to the
+sampled current master pose when the check passes. `--init-mode offset` and
 `--init-mode none` are also available.
 
 ## `scripts/decode_master_can.py`

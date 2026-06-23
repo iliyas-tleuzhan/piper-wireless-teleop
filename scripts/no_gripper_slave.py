@@ -46,7 +46,7 @@ def parse_args() -> argparse.Namespace:
         choices=("align", "offset", "none"),
         default="align",
         help=(
-            "Startup safety mode. align prompts and slowly corrects the slave before teleop; "
+            "Startup safety mode. align silently waits for close poses and corrects the slave; "
             "offset keeps slave_init_current + current master delta; none skips correction."
         ),
     )
