@@ -24,13 +24,30 @@ PYTHONPATH=. python scripts/master_sender.py --can can0 --target-ip <COMPUTER_2_
 ## `scripts/slave_receiver.py`
 
 Runs on Computer 2. Receives UDP packets, validates them, and commands the latest
-valid target directly through `piper_sdk`.
+valid target through `piper_sdk` after startup initialization.
 
 Moves robot: yes. Requires `--confirm MOVE`.
 
 ```bash
 PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE
 ```
+
+Default startup mode is `--init-mode align`. It waits for a valid master packet,
+prompts the operator to place both arms in the same safe visual starting pose,
+prints master/slave raw and degree starts, rejects any joint more than 8 degrees
+apart, and only slowly moves the slave to the master start pose after the
+operator types `ALIGN`. The gripper is ignored until teleop starts.
+
+Other modes:
+
+```bash
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE --init-mode offset
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE --init-mode none
+```
+
+`offset` records the startup poses and commands
+`slave_start + (master_current - master_start)`. `none` is the old direct
+behavior and can jump at startup.
 
 ## `scripts/decode_master_can.py`
 

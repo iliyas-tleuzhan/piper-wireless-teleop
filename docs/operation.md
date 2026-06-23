@@ -17,10 +17,44 @@
 PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE
 ```
 
+`--init-mode align` is the default. Startup is intentionally interactive:
+
+1. The receiver connects to the slave Piper, enables it, and sets the configured
+   joint control/high-follow mode.
+2. It waits for the first valid master packet but does not command the slave to
+   that pose.
+3. It prompts: `Move both master and slave arms to the same safe visual starting
+   pose. Press Enter when ready.`
+4. After Enter, it reads the latest master target and about 0.5 seconds of
+   stable slave feedback from `GetArmJointMsgs()`, discarding initial/default
+   all-zero feedback frames.
+5. It prints `master_start`, `slave_start`, and per-joint differences in raw
+   units and degrees.
+6. Any joint more than 8 degrees apart is rejected and the prompt repeats.
+7. If the check passes, the receiver asks you to type `ALIGN`. Only then does it
+   slowly move the slave from its feedback pose to `master_start` using small
+   0.3 degree steps every 20 ms.
+8. Normal absolute teleop starts after the slave is close to `master_start`.
+
+Visual alignment is the human check that both arms look like they are in the
+same safe pose. CAN/raw alignment is the numeric check that master target values
+and slave feedback values, both in Piper 0.001 degree units, differ by no more
+than 8 degrees per joint.
+
 Optional overrides:
 
 ```bash
 PYTHONPATH=. python scripts/slave_receiver.py --config configs/default.yaml --bind-ip 0.0.0.0 --udp-port 5005 --can can0 --confirm MOVE
+```
+
+Startup mode overrides:
+
+```bash
+# No startup correction. Teleop uses slave_start + (master_current - master_start).
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE --init-mode offset
+
+# Old direct startup behavior. This can jump if the arms are not already aligned.
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE --init-mode none
 ```
 
 ## Computer 1: Master Sender
@@ -40,9 +74,9 @@ timeout safety. The sender timestamp is kept only for debugging, so the two
 computers do not need synchronized wall clocks to avoid false stale-packet
 rejection.
 
-Accepted packets are commanded directly to the slave by default. Slew limiting
-is disabled by default because it made wireless motion much slower than wired
-Piper master-slave teleoperation.
+After startup initialization, accepted packets are commanded directly to the
+slave by default. Slew limiting is disabled by default because it made wireless
+motion much slower than wired Piper master-slave teleoperation.
 
 ## Test UDP Before Moving
 

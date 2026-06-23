@@ -1,7 +1,11 @@
 """Tests for slave receiver command selection without Piper hardware."""
 
 from piper_wireless_teleop.config import SafetyConfig
-from scripts.slave_receiver import choose_command_joints
+from scripts.slave_receiver import (
+    apply_offset_command,
+    choose_command_joints,
+    extract_feedback_joints_raw,
+)
 
 
 def safety_config(enable_slew_limit: bool) -> SafetyConfig:
@@ -35,3 +39,30 @@ def test_optional_slew_limit_only_when_enabled() -> None:
         target_joints=[10000, 0, 0, 0, 0, 0],
         safety_config=safety_config(enable_slew_limit=True),
     ) == [3000, 0, 0, 0, 0, 0]
+
+
+def test_offset_command_maps_master_delta_onto_slave_start() -> None:
+    """Offset mode preserves the slave startup pose and applies master deltas."""
+
+    assert apply_offset_command(
+        master_current=[11000, 20000, -30000, 40000, 50000, -60000],
+        master_start=[10000, 20000, -25000, 40000, 45000, -65000],
+        slave_start=[9000, 21000, -26000, 39000, 46000, -64000],
+    ) == [10000, 21000, -31000, 39000, 51000, -59000]
+
+
+def test_feedback_extraction_handles_nested_joint_state_attrs() -> None:
+    """Piper SDK feedback objects can wrap joint values in a joint_state object."""
+
+    class JointState:
+        joint_1 = 1000
+        joint_2 = 2000
+        joint_3 = -3000
+        joint_4 = 4000
+        joint_5 = 5000
+        joint_6 = -6000
+
+    class Feedback:
+        joint_state = JointState()
+
+    assert extract_feedback_joints_raw(Feedback()) == [1000, 2000, -3000, 4000, 5000, -6000]

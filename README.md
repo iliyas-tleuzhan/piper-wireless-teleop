@@ -57,7 +57,9 @@ ip -details link show can0
 ## Quick Start
 
 Start Computer 2 first. This side moves the slave arm and requires explicit
-confirmation:
+confirmation. The default `--init-mode align` waits for a master packet, asks
+you to visually place both arms in the same safe starting pose, checks CAN/raw
+joint feedback, and only moves the slave slowly after you type `ALIGN`:
 
 ```bash
 PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE
@@ -84,6 +86,8 @@ PYTHONPATH=. python scripts/test_udp.py sender --target-ip <COMPUTER_2_IP> --por
 - Keep the slave arm power cutoff or E-stop within reach.
 - Power-cycle the slave Piper fresh before important tests.
 - Start with both arms in similar poses.
+- Use the default safe alignment startup. The slave will not move toward the
+  master pose until the visual/CAN alignment check passes and you type `ALIGN`.
 - Confirm the master and slave are not on the same CAN bus.
 - Test UDP before enabling robot movement.
 - Check `can0` with `ip -details link show can0` and `candump can0`.
@@ -101,10 +105,27 @@ config values. Sender packet timestamps are for debugging only. The slave uses
 receiver-side `time.monotonic()` and sequence numbers, so Computer 1 and
 Computer 2 wall clocks do not need to be synchronized for timeout safety.
 
-Wireless teleop commands the latest valid master target directly by default.
-Slew limiting is disabled by default because limiting every packet makes the
-slave feel much slower than wired Piper master-slave teleoperation. It remains
-available only as an explicit config fallback with `safety.enable_slew_limit`.
+Wireless teleop starts in `--init-mode align` by default. During startup, the
+receiver compares the latest master joint target with stable slave feedback from
+`GetArmJointMsgs()`. Both are Piper raw units of 0.001 degrees. Visual alignment
+means the operator places both arms in the same safe pose by sight; CAN/raw
+alignment means every joint is within the 8 degree startup threshold. If a joint
+is farther away, the receiver prints the joint and asks you to adjust again.
+
+After the check passes, the receiver asks you to type `ALIGN`. Only then does it
+slowly correct the slave from its current feedback pose to `master_start` with
+small 0.3 degree steps every 20 ms. Gripper commands are ignored until normal
+teleop starts. `--init-mode offset` is available as a fallback when you do not
+want the slave corrected at startup; it commands
+`slave_start + (master_current - master_start)` during teleop. `--init-mode none`
+keeps the old direct startup behavior and prints a warning because the slave can
+jump to the master pose.
+
+After initialization, accepted packets are commanded directly to the slave by
+default. Slew limiting is disabled by default because limiting every packet
+makes the slave feel much slower than wired Piper master-slave teleoperation. It
+remains available only as an explicit config fallback with
+`safety.enable_slew_limit`.
 
 Important defaults:
 
@@ -115,6 +136,8 @@ Important defaults:
 - Status output: `2 Hz`
 - Piper speed percent: `100`
 - Follow/high-follow mode: `0xAD`
+- Startup init mode: `align`
+- Startup alignment threshold: `8 deg`
 - Joint hard bounds: J1 `-154..154`, J2 `0..195`, J3 `-175..0`,
   J4 `-106..106`, J5 `-75..75`, J6 `-100..100` degrees
 - Slew limiting: disabled by default
