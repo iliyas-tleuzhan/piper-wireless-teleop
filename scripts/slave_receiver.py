@@ -30,7 +30,7 @@ from piper_wireless_teleop.safety import (
 from piper_wireless_teleop.slave_can_writer import PiperSlaveWriter
 from piper_wireless_teleop.udp_transport import UdpReceiver
 
-ALIGN_THRESHOLD_DEG = 8.0
+ALIGN_THRESHOLD_DEG = 15.0
 ALIGN_STEP_DEG = 0.3
 ALIGN_TICK_S = 0.02
 ALIGN_TIMEOUT_S = 10.0
@@ -404,10 +404,7 @@ def initialize_teleop(
             )
             return StartupInit(mode="offset", master_start=master_start, slave_start=slave_start)
 
-        confirmation = input("Type ALIGN to slowly move the slave to the master_start pose: ")
-        if confirmation != "ALIGN":
-            print("[SLAVE] ALIGN was not typed; slave was not moved. Rechecking alignment.", flush=True)
-            continue
+        input("Press Enter to slowly move the slave to the master_start pose.")
         if slowly_align_slave_to_master_start(
             writer=writer,
             slave_start=slave_start,

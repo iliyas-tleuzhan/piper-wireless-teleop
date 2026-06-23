@@ -34,9 +34,9 @@ PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE
 
 Default startup mode is `--init-mode align`. It waits for a valid master packet,
 prompts the operator to place both arms in the same safe visual starting pose,
-prints master/slave raw and degree starts, rejects any joint more than 8 degrees
+prints master/slave raw and degree starts, rejects any joint more than 15 degrees
 apart, and only slowly moves the slave to the master start pose after the
-operator types `ALIGN`. The gripper is ignored until teleop starts.
+operator presses Enter. The gripper is ignored until teleop starts.
 
 Other modes:
 
@@ -73,8 +73,8 @@ PYTHONPATH=. python scripts/no_gripper_slave.py --can can0 --confirm MOVE
 
 This script uses the same default `--init-mode align` startup as
 `scripts/slave_receiver.py`: it waits for a valid master packet, checks
-master/slave startup pose differences against the 8 degree threshold, and only
-slowly corrects the slave after the operator types `ALIGN`. `--init-mode offset`
+master/slave startup pose differences against the 15 degree threshold, and only
+slowly corrects the slave after the operator presses Enter. `--init-mode offset`
 and `--init-mode none` are also available.
 
 ## `scripts/decode_master_can.py`

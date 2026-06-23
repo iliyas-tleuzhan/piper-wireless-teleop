@@ -30,8 +30,8 @@ PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --con
    all-zero feedback frames.
 5. It prints `master_start`, `slave_start`, and per-joint differences in raw
    units and degrees.
-6. Any joint more than 8 degrees apart is rejected and the prompt repeats.
-7. If the check passes, the receiver asks you to type `ALIGN`. Only then does it
+6. Any joint more than 15 degrees apart is rejected and the prompt repeats.
+7. If the check passes, the receiver asks you to press Enter. Only then does it
    slowly move the slave from its feedback pose to `master_start` using small
    0.3 degree steps every 20 ms.
 8. Normal absolute teleop starts after the slave is close to `master_start`.
@@ -39,7 +39,7 @@ PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --con
 Visual alignment is the human check that both arms look like they are in the
 same safe pose. CAN/raw alignment is the numeric check that master target values
 and slave feedback values, both in Piper 0.001 degree units, differ by no more
-than 8 degrees per joint.
+than 15 degrees per joint.
 
 Optional overrides:
 

@@ -59,7 +59,7 @@ ip -details link show can0
 Start Computer 2 first. This side moves the slave arm and requires explicit
 confirmation. The default `--init-mode align` waits for a master packet, asks
 you to visually place both arms in the same safe starting pose, checks CAN/raw
-joint feedback, and only moves the slave slowly after you type `ALIGN`:
+joint feedback, and only moves the slave slowly after you press Enter:
 
 ```bash
 PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE
@@ -87,7 +87,7 @@ PYTHONPATH=. python scripts/test_udp.py sender --target-ip <COMPUTER_2_IP> --por
 - Power-cycle the slave Piper fresh before important tests.
 - Start with both arms in similar poses.
 - Use the default safe alignment startup. The slave will not move toward the
-  master pose until the visual/CAN alignment check passes and you type `ALIGN`.
+  master pose until the visual/CAN alignment check passes and you press Enter.
 - Confirm the master and slave are not on the same CAN bus.
 - Test UDP before enabling robot movement.
 - Check `can0` with `ip -details link show can0` and `candump can0`.
@@ -109,10 +109,10 @@ Wireless teleop starts in `--init-mode align` by default. During startup, the
 receiver compares the latest master joint target with stable slave feedback from
 `GetArmJointMsgs()`. Both are Piper raw units of 0.001 degrees. Visual alignment
 means the operator places both arms in the same safe pose by sight; CAN/raw
-alignment means every joint is within the 8 degree startup threshold. If a joint
+alignment means every joint is within the 15 degree startup threshold. If a joint
 is farther away, the receiver prints the joint and asks you to adjust again.
 
-After the check passes, the receiver asks you to type `ALIGN`. Only then does it
+After the check passes, the receiver asks you to press Enter. Only then does it
 slowly correct the slave from its current feedback pose to `master_start` with
 small 0.3 degree steps every 20 ms. Gripper commands are ignored until normal
 teleop starts. `--init-mode offset` is available as a fallback when you do not
@@ -137,7 +137,7 @@ Important defaults:
 - Piper speed percent: `100`
 - Follow/high-follow mode: `0xAD`
 - Startup init mode: `align`
-- Startup alignment threshold: `8 deg`
+- Startup alignment threshold: `15 deg`
 - Joint hard bounds: J1 `-154..154`, J2 `0..195`, J3 `-175..0`,
   J4 `-106..106`, J5 `-75..75`, J6 `-100..100` degrees
 - Slew limiting: disabled by default

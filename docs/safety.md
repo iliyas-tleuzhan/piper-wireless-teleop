@@ -50,12 +50,12 @@ are official Piper raw joint units of 0.001 degrees. Initial/default all-zero
 feedback frames are discarded before the comparison.
 
 Visual alignment is the human pose check. CAN/raw alignment is the numeric
-check. Every joint must be within 8 degrees. If any joint is farther away, the
+check. Every joint must be within 15 degrees. If any joint is farther away, the
 receiver prints the joint number and the difference, and asks the operator to
 adjust both arms again.
 
 When the numeric check passes, the slave still does not move automatically. The
-operator must type `ALIGN`; then only the slave arm is slowly corrected from its
+operator presses Enter; then only the slave arm is slowly corrected from its
 current feedback pose to the confirmed `master_start` pose using 0.3 degree
 steps every 20 ms. Ctrl+C stops the process, and the alignment motion times out
 after 10 seconds. Gripper commands are not sent until normal teleop starts.
