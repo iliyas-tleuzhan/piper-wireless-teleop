@@ -41,13 +41,13 @@ def test_optional_slew_limit_only_when_enabled() -> None:
     ) == [3000, 0, 0, 0, 0, 0]
 
 
-def test_offset_command_maps_master_delta_onto_slave_start() -> None:
-    """Offset mode preserves the slave startup pose and applies master deltas."""
+def test_offset_command_maps_current_master_motion_onto_sampled_slave_current() -> None:
+    """Offset mode preserves the sampled slave current pose and applies master deltas."""
 
     assert apply_offset_command(
         master_current=[11000, 20000, -30000, 40000, 50000, -60000],
-        master_start=[10000, 20000, -25000, 40000, 45000, -65000],
-        slave_start=[9000, 21000, -26000, 39000, 46000, -64000],
+        master_init_current=[10000, 20000, -25000, 40000, 45000, -65000],
+        slave_init_current=[9000, 21000, -26000, 39000, 46000, -64000],
     ) == [10000, 21000, -31000, 39000, 51000, -59000]
 
 

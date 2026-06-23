@@ -47,7 +47,7 @@ def parse_args() -> argparse.Namespace:
         default="align",
         help=(
             "Startup safety mode. align prompts and slowly corrects the slave before teleop; "
-            "offset keeps slave_start + master_delta; none uses old direct behavior."
+            "offset keeps slave_init_current + current master delta; none skips correction."
         ),
     )
     return parser.parse_args()
@@ -157,12 +157,12 @@ def main() -> None:
 
             command_target_joints = target_joints
             if startup.mode == "offset":
-                if startup.master_start is None or startup.slave_start is None:
-                    raise RuntimeError("offset startup missing master/slave start poses")
+                if startup.master_init_current is None or startup.slave_init_current is None:
+                    raise RuntimeError("offset startup missing sampled master/slave current poses")
                 command_target_joints = apply_offset_command(
                     master_current=target_joints,
-                    master_start=startup.master_start,
-                    slave_start=startup.slave_start,
+                    master_init_current=startup.master_init_current,
+                    slave_init_current=startup.slave_init_current,
                 )
 
             next_joints = choose_command_joints(

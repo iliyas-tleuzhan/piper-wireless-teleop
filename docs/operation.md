@@ -23,14 +23,16 @@ PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --con
    joint control/high-follow mode.
 2. It prompts: `Move both master and slave arms to the same safe visual starting
    pose. Press Enter when ready.`
-3. After Enter, it silently reads the current master target and about 0.5 seconds of
-   stable slave feedback from `GetArmJointMsgs()`, discarding initial/default
-   all-zero feedback frames.
+3. After Enter, it silently samples current master packets for about 0.5 seconds
+   and uses the latest one, then reads about 0.5 seconds of stable slave
+   feedback from `GetArmJointMsgs()`, discarding initial/default all-zero
+   feedback frames.
 4. Any joint more than 15 degrees apart is printed, rejected, and the prompt
    repeats.
-5. If the check passes, it slowly moves the slave from its feedback pose to
-   `master_start` using small 0.3 degree steps every 20 ms.
-6. Normal absolute teleop starts after the slave is close to `master_start`.
+5. If the check passes, it slowly moves the slave from its current feedback pose
+   to the sampled current master pose using small 0.3 degree steps every 20 ms.
+6. Normal absolute teleop starts after the slave is close to that sampled
+   current master pose.
 
 Visual alignment is the human check that both arms look like they are in the
 same safe pose. CAN/raw alignment is the numeric check that master target values
@@ -46,10 +48,10 @@ PYTHONPATH=. python scripts/slave_receiver.py --config configs/default.yaml --bi
 Startup mode overrides:
 
 ```bash
-# No startup correction. Teleop uses slave_start + (master_current - master_start).
+# No startup correction. Teleop uses slave_init_current + (master_current - master_init_current).
 PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE --init-mode offset
 
-# Old direct startup behavior. This can jump if the arms are not already aligned.
+# Check current poses, skip slow correction, then start absolute teleop.
 PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE --init-mode none
 ```
 

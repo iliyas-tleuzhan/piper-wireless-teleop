@@ -58,9 +58,9 @@ ip -details link show can0
 
 Start Computer 2 first. This side moves the slave arm and requires explicit
 confirmation. The default `--init-mode align` asks you to visually place both
-arms in the same safe starting pose, checks current master target and slave
-feedback after you press Enter, and then slowly aligns the slave if the check
-passes:
+arms in the same safe starting pose, samples the current master target and
+current slave feedback after you press Enter, and then slowly aligns the slave
+if the check passes:
 
 ```bash
 PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE
@@ -108,18 +108,21 @@ Computer 2 wall clocks do not need to be synchronized for timeout safety.
 
 Wireless teleop starts in `--init-mode align` by default. During startup, the
 receiver compares the latest master joint target with stable slave feedback from
-`GetArmJointMsgs()`. Both are Piper raw units of 0.001 degrees. Visual alignment
-means the operator places both arms in the same safe pose by sight; CAN/raw
-alignment means every joint is within the 15 degree startup threshold. If a joint
-is farther away, the receiver prints the joint and asks you to adjust again.
+`GetArmJointMsgs()`. The master target is sampled silently after Enter so queued
+UDP packets from before Enter are skipped. Both values are Piper raw units of
+0.001 degrees. Visual alignment means the operator places both arms in the same
+safe pose by sight; CAN/raw alignment means every joint is within the 15 degree
+startup threshold. If a joint is farther away, the receiver prints the joint and
+asks you to adjust again.
 
 After the check passes, the receiver slowly corrects the slave from its current
-feedback pose to `master_start` with small 0.3 degree steps every 20 ms. Gripper
+feedback pose to the sampled current master pose with small 0.3 degree steps every 20 ms. Gripper
 commands are ignored until normal teleop starts. `--init-mode offset` is
 available as a fallback when you do not want the slave corrected at startup; it commands
-`slave_start + (master_current - master_start)` during teleop. `--init-mode none`
-keeps the old direct startup behavior and prints a warning because the slave can
-jump to the master pose.
+`slave_init_current + (master_current - master_init_current)` during teleop.
+`--init-mode none` still performs the same current master/current slave check,
+then skips the slow correction and starts normal absolute teleop from the
+checked pose.
 
 After initialization, accepted packets are commanded directly to the slave by
 default. Slew limiting is disabled by default because limiting every packet

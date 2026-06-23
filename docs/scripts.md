@@ -33,10 +33,11 @@ PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE
 ```
 
 Default startup mode is `--init-mode align`. It prompts the operator to place
-both arms in the same safe visual starting pose, silently checks the current
-master target against current slave feedback after Enter, prints only joints
-that are more than 15 degrees apart, and slowly moves the slave to the master
-start pose when the check passes. The gripper is ignored until teleop starts.
+both arms in the same safe visual starting pose, silently samples the current
+master target after Enter, compares it against current slave feedback, prints
+only joints that are more than 15 degrees apart, and slowly moves the slave to
+the sampled current master pose when the check passes. The gripper is ignored
+until teleop starts.
 
 Other modes:
 
@@ -45,9 +46,9 @@ PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE --init-m
 PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE --init-mode none
 ```
 
-`offset` records the startup poses and commands
-`slave_start + (master_current - master_start)`. `none` is the old direct
-behavior and can jump at startup.
+`offset` records the sampled current startup poses and commands
+`slave_init_current + (master_current - master_init_current)`. `none` checks
+the current poses, skips slow correction, and starts normal absolute teleop.
 
 ## `scripts/no_gripper_master.py`
 
@@ -74,7 +75,8 @@ PYTHONPATH=. python scripts/no_gripper_slave.py --can can0 --confirm MOVE
 This script uses the same default `--init-mode align` startup as
 `scripts/slave_receiver.py`: it prompts the operator, silently checks current
 master/slave pose differences against the 15 degree threshold after Enter, and
-slowly corrects the slave when the check passes. `--init-mode offset` and
+slowly corrects the slave to the sampled current master pose when the check
+passes. `--init-mode offset` and
 `--init-mode none` are also available.
 
 ## `scripts/decode_master_can.py`

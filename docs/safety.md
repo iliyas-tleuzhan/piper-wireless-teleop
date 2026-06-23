@@ -45,9 +45,11 @@ the arms.
 
 The operator must visually place the master and slave arms in the same safe
 starting pose and press Enter. The receiver then silently compares the current master
-joint target with stable slave feedback from `GetArmJointMsgs()`. Both values
-are official Piper raw joint units of 0.001 degrees. Initial/default all-zero
-feedback frames are discarded before the comparison.
+joint target with stable slave feedback from `GetArmJointMsgs()`. The master
+target is sampled for about 0.5 seconds after Enter so queued UDP packets from
+before Enter are skipped. Both values are official Piper raw joint units of
+0.001 degrees. Initial/default all-zero feedback frames are discarded before the
+comparison.
 
 Visual alignment is the human pose check. CAN/raw alignment is the numeric
 check. Every joint must be within 15 degrees. If any joint is farther away, the
@@ -55,15 +57,16 @@ receiver prints the joint number and the difference, and asks the operator to
 adjust both arms again.
 
 When the numeric check passes, only the slave arm is slowly corrected from its
-current feedback pose to the confirmed `master_start` pose using 0.3 degree
+current feedback pose to the sampled current master pose using 0.3 degree
 steps every 20 ms. Ctrl+C stops the process, and the alignment motion times out
 after 10 seconds. Gripper commands are not sent until normal teleop starts.
 
 `--init-mode offset` is a fallback that avoids startup correction. It records
-`master_start` and `slave_start`, then commands
-`slave_start + (master_current - master_start)` during teleop. `--init-mode none`
-keeps the old direct startup behavior and prints a warning because the slave can
-jump if the two arms are not already aligned.
+the sampled current master and slave poses, then commands
+`slave_init_current + (master_current - master_init_current)` during teleop.
+`--init-mode none` still performs the same current master/current slave check,
+then skips the slow correction and starts normal absolute teleop from the
+checked pose.
 
 ## Normal Teleop Motion
 

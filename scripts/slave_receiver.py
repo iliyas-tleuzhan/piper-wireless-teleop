@@ -34,6 +34,7 @@ ALIGN_THRESHOLD_DEG = 15.0
 ALIGN_STEP_DEG = 0.3
 ALIGN_TICK_S = 0.02
 ALIGN_TIMEOUT_S = 10.0
+MASTER_CURRENT_SAMPLE_S = 0.5
 SLAVE_FEEDBACK_SAMPLE_S = 0.5
 
 
@@ -42,8 +43,8 @@ class StartupInit:
     """Teleop initialization state selected before normal packet forwarding."""
 
     mode: str
-    master_start: list[int] | None = None
-    slave_start: list[int] | None = None
+    master_init_current: list[int] | None = None
+    slave_init_current: list[int] | None = None
 
 
 def parse_args() -> argparse.Namespace:
@@ -61,7 +62,7 @@ def parse_args() -> argparse.Namespace:
         default="align",
         help=(
             "Startup safety mode. align prompts and slowly corrects the slave before teleop; "
-            "offset keeps slave_start + master_delta; none uses old direct behavior."
+            "offset keeps slave_init_current + current master delta; none skips correction."
         ),
     )
     return parser.parse_args()
@@ -106,16 +107,16 @@ def choose_command_joints(
 def apply_offset_command(
     *,
     master_current: Sequence[int],
-    master_start: Sequence[int],
-    slave_start: Sequence[int],
+    master_init_current: Sequence[int],
+    slave_init_current: Sequence[int],
 ) -> list[int]:
-    """Map master motion deltas onto the slave's startup feedback pose."""
+    """Map master motion deltas onto the slave's sampled initialization pose."""
 
     return clamp_joints_raw(
         [
-            int(slave_value) + int(current_value) - int(start_value)
-            for current_value, start_value, slave_value in zip(
-                master_current, master_start, slave_start, strict=True
+            int(slave_value) + int(current_value) - int(init_value)
+            for current_value, init_value, slave_value in zip(
+                master_current, master_init_current, slave_init_current, strict=True
             )
         ]
     )
@@ -221,16 +222,24 @@ def read_stable_slave_feedback(writer: PiperSlaveWriter) -> list[int]:
         time.sleep(ALIGN_TICK_S)
 
 
-def wait_for_valid_master_packet(
+def read_current_master_packet(
     *,
     receiver: UdpReceiver,
     tracker: SlavePacketTracker,
 ) -> list[int]:
-    """Wait for the next valid master packet without commanding the slave."""
+    """Read the latest valid master packet after Enter, skipping queued packets."""
 
+    latest: list[int] | None = None
+    sample_started_s: float | None = None
     while True:
         received = receiver.recv()
         if received is None:
+            if (
+                latest is not None
+                and sample_started_s is not None
+                and time.monotonic() - sample_started_s >= MASTER_CURRENT_SAMPLE_S
+            ):
+                return latest
             continue
 
         data, _address = received
@@ -245,15 +254,23 @@ def wait_for_valid_master_packet(
             continue
         if decision.target_joints is None:
             continue
-        return decision.target_joints
+
+        latest = decision.target_joints
+        now_s = time.monotonic()
+        if sample_started_s is None:
+            sample_started_s = now_s
+        if now_s - sample_started_s >= MASTER_CURRENT_SAMPLE_S:
+            return latest
 
 
-def calculate_alignment_diffs(master_start: Sequence[int], slave_start: Sequence[int]) -> list[float]:
+def calculate_alignment_diffs(
+    master_current: Sequence[int], slave_current: Sequence[int]
+) -> list[float]:
     """Return per-joint startup degree differences."""
 
     return [
         raw_to_deg(int(master_value) - int(slave_value))
-        for master_value, slave_value in zip(master_start, slave_start, strict=True)
+        for master_value, slave_value in zip(master_current, slave_current, strict=True)
     ]
 
 
@@ -277,16 +294,16 @@ def report_alignment_errors(diffs_deg: Sequence[float]) -> bool:
     return False
 
 
-def slowly_align_slave_to_master_start(
+def slowly_align_slave_to_master_current(
     *,
     writer: PiperSlaveWriter,
-    slave_start: Sequence[int],
-    master_start: Sequence[int],
+    slave_current: Sequence[int],
+    master_current: Sequence[int],
 ) -> bool:
-    """Slowly move the slave from feedback pose to the confirmed master pose."""
+    """Slowly move the slave from current feedback pose to current master pose."""
 
-    commanded = clamp_joints_raw(slave_start)
-    target = clamp_joints_raw(master_start)
+    commanded = clamp_joints_raw(slave_current)
+    target = clamp_joints_raw(master_current)
     max_step_raw = deg_to_raw(ALIGN_STEP_DEG)
     close_raw = deg_to_raw(0.5)
     start_s = time.monotonic()
@@ -321,42 +338,50 @@ def initialize_teleop(
 ) -> StartupInit:
     """Run the selected startup initialization before normal teleop."""
 
-    if init_mode == "none":
-        print(
-            "[SLAVE] WARNING: --init-mode none uses old direct startup behavior. "
-            "The slave can jump to the master pose when the first command is sent.",
-            flush=True,
-        )
-        return StartupInit(mode="none")
-
     while True:
         input(
             "Move both master and slave arms to the same safe visual starting pose. "
             "Press Enter when ready."
         )
-        master_start = wait_for_valid_master_packet(
+        master_current = read_current_master_packet(
             receiver=receiver,
             tracker=tracker,
         )
-        slave_start = read_stable_slave_feedback(writer)
-        diffs_deg = calculate_alignment_diffs(master_start, slave_start)
+        slave_current = read_stable_slave_feedback(writer)
+        diffs_deg = calculate_alignment_diffs(master_current, slave_current)
         if not report_alignment_errors(diffs_deg):
             continue
+
+        if init_mode == "none":
+            print(
+                "[SLAVE] WARNING: --init-mode none skips slave alignment correction. "
+                "Normal teleop will start from the current checked pose.",
+                flush=True,
+            )
+            return StartupInit(mode="none")
 
         if init_mode == "offset":
             print(
                 "[SLAVE] Offset init accepted. Teleop will command "
-                "slave_start + (master_current - master_start).",
+                "slave_init_current + (master_current - master_init_current).",
                 flush=True,
             )
-            return StartupInit(mode="offset", master_start=master_start, slave_start=slave_start)
+            return StartupInit(
+                mode="offset",
+                master_init_current=master_current,
+                slave_init_current=slave_current,
+            )
 
-        if slowly_align_slave_to_master_start(
+        if slowly_align_slave_to_master_current(
             writer=writer,
-            slave_start=slave_start,
-            master_start=master_start,
+            slave_current=slave_current,
+            master_current=master_current,
         ):
-            return StartupInit(mode="align", master_start=master_start, slave_start=slave_start)
+            return StartupInit(
+                mode="align",
+                master_init_current=master_current,
+                slave_init_current=slave_current,
+            )
 
 
 def main() -> None:
@@ -427,12 +452,12 @@ def main() -> None:
 
             command_target_joints = target_joints
             if startup.mode == "offset":
-                if startup.master_start is None or startup.slave_start is None:
-                    raise RuntimeError("offset startup missing master/slave start poses")
+                if startup.master_init_current is None or startup.slave_init_current is None:
+                    raise RuntimeError("offset startup missing sampled master/slave current poses")
                 command_target_joints = apply_offset_command(
                     master_current=target_joints,
-                    master_start=startup.master_start,
-                    slave_start=startup.slave_start,
+                    master_init_current=startup.master_init_current,
+                    slave_init_current=startup.slave_init_current,
                 )
 
             next_joints = choose_command_joints(
