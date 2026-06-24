@@ -31,8 +31,6 @@ def test_reset_can_interface_runs_standard_command_sequence(monkeypatch) -> None
             "can",
             "bitrate",
             "1000000",
-            "restart-ms",
-            "100",
         ],
         ["sudo", "ip", "link", "set", "can0", "up"],
         ["ip", "-details", "link", "show", "can0"],

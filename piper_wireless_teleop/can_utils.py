@@ -22,8 +22,6 @@ def reset_can_interface(interface: str, bitrate: int) -> bool:
             "can",
             "bitrate",
             str(bitrate),
-            "restart-ms",
-            "100",
         ],
         ["sudo", "ip", "link", "set", interface, "up"],
         ["ip", "-details", "link", "show", interface],

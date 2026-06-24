@@ -7,6 +7,6 @@ IFACE="${1:-can0}"
 BITRATE="${2:-1000000}"
 
 sudo ip link set "$IFACE" down || true
-sudo ip link set "$IFACE" type can bitrate "$BITRATE" restart-ms 100
+sudo ip link set "$IFACE" type can bitrate "$BITRATE"
 sudo ip link set "$IFACE" up
 ip -details link show "$IFACE"
