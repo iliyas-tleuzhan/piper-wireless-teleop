@@ -24,23 +24,54 @@ printing receiver-timeout or deadman warnings.
 
 ## Packets Arrive, Gripper Moves, Joints Do Not
 
-Symptom: packets arrive, `target_deg` and `cmd_deg` change, and the gripper
-moves, but the slave joints do not move.
+Symptom: the slave receiver starts, packets arrive, `target_deg` and `cmd_deg`
+change, and the gripper may move, but the slave joints do not move.
 
 Likely cause: the slave Piper controller may be stuck in a stale
 hold/control/motion-mode state. `GripperCtrl()` can still work while
-`JointCtrl()` is ignored.
+`JointCtrl()` is ignored. The slave CAN interface may also need to be reset.
+
+New behavior: `slave_receiver.py` now resets CAN automatically on exit by
+default, including after Ctrl+C. Because the reset uses `sudo`, the terminal may
+ask for the sudo password during shutdown.
 
 Recovery:
 
 1. Stop `slave_receiver.py`.
-2. Run `PYTHONPATH=. python slave_release.py`.
-3. Restart `slave_receiver.py`.
-4. If joints still do not move, fully power-cycle/unplug/replug the slave Piper
+2. Let the automatic CAN reset finish, then restart `slave_receiver.py`.
+3. If the arm already starts in this state, run the receiver with
+   `--reset-can-before-start`.
+4. If joints still do not move, run `PYTHONPATH=. python slave_release.py`.
+5. If joints still do not move, fully power-cycle/unplug/replug the slave Piper
    arm.
-5. Bring `can0` back up if needed.
 6. Run `PYTHONPATH=. python scripts/test_slave_small_move.py --can can0 --confirm MOVE`.
 7. Then run full teleop again.
+
+Known manual CAN recovery on the slave computer:
+
+```bash
+sudo ip link set can0 down
+sudo ip link set can0 type can bitrate 1000000
+sudo ip link set can0 up
+```
+
+Normal slave receiver command:
+
+```bash
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE
+```
+
+Disable automatic CAN reset:
+
+```bash
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE --no-reset-can-on-exit
+```
+
+Reset CAN before start too:
+
+```bash
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE --reset-can-before-start
+```
 
 ## Slave Movement Delayed
 

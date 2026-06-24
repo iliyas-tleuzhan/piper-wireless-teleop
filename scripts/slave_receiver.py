@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Any
 from pathlib import Path
 
+from piper_wireless_teleop.can_utils import reset_can_interface
 from piper_wireless_teleop.config import SafetyConfig, load_config
 from piper_wireless_teleop.logging_utils import RateLimitedPrinter
 from piper_wireless_teleop.packet import decode_packet
@@ -56,6 +57,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bind-ip", default="0.0.0.0", help="UDP bind address")
     parser.add_argument("--udp-port", type=int, default=None, help="UDP listen port")
     parser.add_argument("--confirm", default="", help="Must be MOVE to allow robot motion")
+    parser.add_argument(
+        "--reset-can-before-start",
+        action="store_true",
+        help="Reset the slave CAN interface before connecting to piper_sdk",
+    )
+    parser.add_argument(
+        "--reset-can-on-exit",
+        dest="reset_can_on_exit",
+        action="store_true",
+        help="Reset the slave CAN interface when the receiver exits",
+    )
+    parser.add_argument(
+        "--no-reset-can-on-exit",
+        dest="reset_can_on_exit",
+        action="store_false",
+        help="Do not reset the slave CAN interface when the receiver exits",
+    )
+    parser.set_defaults(reset_can_on_exit=True)
     parser.add_argument(
         "--init-mode",
         choices=("align", "offset", "none"),
@@ -361,19 +380,24 @@ def main() -> None:
     can_interface = args.can or config.can.interface
     udp_port = args.udp_port or config.network.udp_port
 
-    receiver = UdpReceiver(args.bind_ip, udp_port, config.network.socket_timeout_s)
-    writer = PiperSlaveWriter(can_interface, config.piper)
-    status = RateLimitedPrinter(config.network.status_rate_hz)
-    tracker = SlavePacketTracker()
-
-    print(f"[SLAVE] Listening on {args.bind_ip}:{udp_port}", flush=True)
-    print(f"[SLAVE] Connecting to slave Piper on {can_interface}", flush=True)
-    writer.connect()
-    writer.enable()
-    writer.set_motion_mode()
-    print("[SLAVE] Arm enabled and motion mode configured", flush=True)
+    receiver: UdpReceiver | None = None
 
     try:
+        if args.reset_can_before_start:
+            reset_can_interface(can_interface, config.can.bitrate)
+
+        receiver = UdpReceiver(args.bind_ip, udp_port, config.network.socket_timeout_s)
+        writer = PiperSlaveWriter(can_interface, config.piper)
+        status = RateLimitedPrinter(config.network.status_rate_hz)
+        tracker = SlavePacketTracker()
+
+        print(f"[SLAVE] Listening on {args.bind_ip}:{udp_port}", flush=True)
+        print(f"[SLAVE] Connecting to slave Piper on {can_interface}", flush=True)
+        writer.connect()
+        writer.enable()
+        writer.set_motion_mode()
+        print("[SLAVE] Arm enabled and motion mode configured", flush=True)
+
         startup = initialize_teleop(
             init_mode=args.init_mode,
             receiver=receiver,
@@ -466,7 +490,10 @@ def main() -> None:
     except KeyboardInterrupt:
         print("\n[SLAVE] stopped", flush=True)
     finally:
-        receiver.close()
+        if receiver is not None:
+            receiver.close()
+        if args.reset_can_on_exit:
+            reset_can_interface(can_interface, config.can.bitrate)
 
 
 if __name__ == "__main__":

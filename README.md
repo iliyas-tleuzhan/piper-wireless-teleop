@@ -59,10 +59,24 @@ ip -details link show can0
 Start Computer 2 first. This side moves the slave arm and requires explicit
 confirmation. The default `--init-mode align` silently waits until the current
 master target and current slave feedback are visually/CAN aligned, then slowly
-aligns the slave before teleop starts:
+aligns the slave before teleop starts. On exit, including after Ctrl+C, the
+slave receiver resets the configured CAN interface by default so the next run
+starts from a cleaner CAN state:
 
 ```bash
 PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE
+```
+
+Disable automatic CAN reset on exit:
+
+```bash
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE --no-reset-can-on-exit
+```
+
+Reset CAN before connecting to the slave Piper too:
+
+```bash
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE --reset-can-before-start
 ```
 
 Then start Computer 1:
@@ -151,10 +165,11 @@ Important defaults:
 - UDP packets not arriving: verify IP address, firewall, subnet, and port `5005`.
 - Slave not moving: confirm `--confirm MOVE`, `--deadman`, Piper enable state, and
   that valid packets are arriving before the receiver timeout.
-- Gripper moves but joints do not: the slave Piper controller may be stuck in a
-  stale hold/control/motion-mode state. Stop `slave_receiver.py`, run
-  `slave_release.py`, restart `slave_receiver.py`, then power-cycle the slave arm
-  if joints still ignore commands.
+- Gripper moves but joints do not: the slave Piper controller or CAN interface
+  may be stuck in a stale state. Stop `slave_receiver.py`; it now resets CAN on
+  exit by default. If needed, run the manual CAN reset commands from the CAN
+  Setup section on the slave computer, restart `slave_receiver.py`, then
+  power-cycle the slave arm if joints still ignore commands.
 - Negative packet age: no longer a safety error; sender timestamps are debug-only.
 - Delayed movement: reduce Wi-Fi congestion, avoid verbose packet logging, and
   keep the control machines close to the access point.
