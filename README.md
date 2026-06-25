@@ -85,6 +85,41 @@ Then start Computer 1:
 PYTHONPATH=. python scripts/master_sender.py --can can0 --target-ip <COMPUTER_2_IP> --deadman
 ```
 
+## Run both sides from Computer 1 with tmux + SSH
+
+Computer 1 must be able to SSH into Computer 2 first:
+
+```bash
+ssh dase_iot@192.168.50.1
+```
+
+Computer 2 must have an SSH server running:
+
+```bash
+sudo apt install -y openssh-server
+sudo systemctl enable --now ssh
+```
+
+Run the launcher from Computer 1:
+
+```bash
+chmod +x scripts/run_teleop_tmux.sh
+./scripts/run_teleop_tmux.sh
+```
+
+The left tmux pane SSHes into Computer 2 and starts `slave_receiver.py` first.
+The right tmux pane runs on Computer 1 and waits for Enter before starting
+`master_sender.py`.
+
+tmux controls:
+
+```text
+Ctrl+b then arrow key = switch pane
+Ctrl+b then d = detach
+tmux attach -t piper-teleop = reattach
+Ctrl+C = stop the running script in the selected pane
+```
+
 UDP-only test without Piper hardware:
 
 ```bash
