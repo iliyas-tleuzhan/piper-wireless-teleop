@@ -12,6 +12,7 @@ def test_default_config_commands_directly() -> None:
     assert config.network.status_rate_hz == 2
     assert config.can.sdk_interface == "socketcan"
     assert config.arm_profile.name == "piper_x"
+    assert config.arm_profile.sdk_firmware == "v189"
     assert not config.safety.enable_slew_limit
     assert not config.safety.startup_sync_required
     assert config.piper.speed_percent == 100

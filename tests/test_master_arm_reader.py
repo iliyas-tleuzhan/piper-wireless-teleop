@@ -3,7 +3,9 @@
 import math
 import pytest
 
+from piper_wireless_teleop.arm_profile import PIPER_X_PROFILE
 from piper_wireless_teleop.master_arm_reader import radians_payload_to_raw
+from piper_wireless_teleop.master_arm_reader import PiperXMasterReader
 
 
 def test_master_feedback_conversion_six_joints() -> None:
@@ -31,3 +33,41 @@ def test_master_feedback_rejects_wrong_joint_count() -> None:
 
     with pytest.raises(ValueError, match="exactly 6"):
         radians_payload_to_raw([0.0] * 5)
+
+
+def test_master_reader_uses_leader_joint_feedback() -> None:
+    """Physical leader-follower teleop reads pyAgxArm leader joint frames."""
+
+    class Feedback:
+        msg = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        hz = 50.0
+        timestamp = 0.0
+
+    class Robot:
+        def __init__(self) -> None:
+            self.normal_called = False
+            self.leader_called = False
+
+        def get_joint_angles(self):
+            self.normal_called = True
+            return Feedback()
+
+        def get_leader_joint_angles(self):
+            self.leader_called = True
+            return Feedback()
+
+    reader = PiperXMasterReader(
+        can_interface="can0",
+        can_bitrate=1000000,
+        sdk_interface="socketcan",
+        profile=PIPER_X_PROFILE,
+    )
+    robot = Robot()
+    reader._robot = robot
+
+    joints, gripper = reader.read_state()
+
+    assert joints == [0, 0, 0, 0, 0, 0]
+    assert gripper is None
+    assert robot.leader_called
+    assert not robot.normal_called

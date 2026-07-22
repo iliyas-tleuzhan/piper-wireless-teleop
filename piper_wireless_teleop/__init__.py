@@ -2,7 +2,7 @@
 
 The package contains reusable pieces shared by the command-line scripts:
 configuration loading, CAN command-frame decoding, UDP packet handling, safety
-limits, and a small wrapper around the official ``piper_sdk`` interface.
+limits, and small adapters around official AgileX SDK interfaces.
 """
 
 __all__ = [

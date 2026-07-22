@@ -44,7 +44,7 @@ shell_quote() {
 
 # Build the Computer 2 command locally so the editable variables above are
 # expanded before ssh starts the remote shell.
-REMOTE_CMD="cd $(shell_quote "$REMOTE_REPO") && source ~/miniconda3/etc/profile.d/conda.sh && conda activate $(shell_quote "$CONDA_ENV") && PYTHONPATH=. python scripts/slave_receiver.py --can $(shell_quote "$REMOTE_CAN") --bind-ip 0.0.0.0 --confirm MOVE"
+REMOTE_CMD="cd $(shell_quote "$REMOTE_REPO") && source ~/miniconda3/etc/profile.d/conda.sh && conda activate $(shell_quote "$CONDA_ENV") && PYTHONPATH=. python scripts/slave_receiver.py --can $(shell_quote "$REMOTE_CAN") --bind-ip 0.0.0.0"
 LEFT_CMD="ssh -t $(shell_quote "${COMPUTER2_USER}@${COMPUTER2_IP}") $(shell_quote "$REMOTE_CMD")"
 
 # Build the Computer 1 command. It waits for Enter so the slave receiver can be

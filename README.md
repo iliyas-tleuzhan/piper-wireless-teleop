@@ -32,8 +32,10 @@ Defaults live in `configs/default.yaml`.
 - Receiver timeout: `0.5 s`
 - Status output: `2 Hz`
 - PiPER-X command units on the wire: six joints in raw `0.001 degree` units plus optional gripper
-- PiPER-X SDK command units: `pyAgxArm.move_j()` radians
-- PiPER-X feedback API: `pyAgxArm.get_joint_angles()` radians
+- PiPER-X SDK command stream: `pyAgxArm.move_js()` radians after startup sync
+- PiPER-X master feedback API: `pyAgxArm.get_leader_joint_angles()` radians
+- PiPER-X gripper command API: `AGX_GRIPPER.move_gripper_m()` meters/Newtons
+- PiPER-X firmware selector: `PiperFW.V189` by default
 
 PiPER-X runtime limits are stored in `piper_wireless_teleop/arm_profile.py` from official PiPER-X URDF limits:
 
@@ -72,14 +74,14 @@ sudo ip link set can0 up
 ip -details link show can0
 ```
 
-Expected CAN status includes `state UP` and `bitrate 1000000`. Use `candump can0` to confirm frames before commanding motion.
+Expected CAN status includes `state UP` and `bitrate 1000000`. Use `candump can0` to confirm frames before commanding motion. Do not let this bridge automatically change persistent leader/follower arm modes during bring-up; configure those modes deliberately with official tools only if your hardware/firmware procedure requires it.
 
 ## Computer 2: Slave
 
 Start the receiver first:
 
 ```bash
-PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0
 ```
 
 Expected output:
@@ -117,7 +119,7 @@ Expected output:
 [MASTER] Reading PiPER-X master feedback through pyAgxArm
 ```
 
-The master reads all six PiPER-X joints from `pyAgxArm.get_joint_angles()`, validates complete fresh feedback, reads gripper feedback when available, and transmits the latest complete state at the configured fixed rate.
+The master reads all six PiPER-X leader joints from `pyAgxArm.get_leader_joint_angles()`, validates complete fresh feedback, reads gripper feedback when available, and transmits the latest complete state at the configured fixed rate. The inspected pyAgxArm parser maps those leader joint frames to the physical leader command CAN IDs `0x155`, `0x156`, and `0x157`.
 
 ## UDP-Only Test
 
@@ -142,15 +144,15 @@ Do not start full teleoperation first. Proceed in this exact order:
 7. Test packet timeout and disconnect handling.
 8. Only then allow complete master-slave teleoperation.
 
-No real PiPER-X hardware validation has been performed by this repository change. Treat the joint signs, gripper scaling, firmware selector, and J6 limit mismatch as first-hardware-test verification items.
+No real PiPER-X hardware validation has been performed by this repository change. Treat the joint signs, gripper scaling, actual firmware version, whether the master is already publishing leader joint frames, and the J6 limit mismatch as first-hardware-test verification items.
 
 ## Troubleshooting
 
 - `can0` missing: check adapter driver, USB path, and `ip link`.
 - `candump can0` is silent: check arm power, CAN wiring, termination, and bitrate.
-- Master says feedback is stale or missing: confirm `pyAgxArm` can read `get_joint_angles()` from the master PiPER-X on the same CAN channel.
+- Master says feedback is stale or missing: confirm `pyAgxArm` can read `get_leader_joint_angles()` from the master PiPER-X on the same CAN channel and that the master is configured to publish leader joint frames.
 - Slave refuses packets: inspect the reason printed by `[SLAVE]`; common causes are missing `--deadman`, wrong joint count, out-of-range PiPER-X wrist values, or stale/duplicate sequence numbers.
-- Slave connects but does not move: verify `--confirm MOVE`, arm enable state, CAN traffic on Computer 2, and that the master and slave are not connected to the same CAN bus.
+- Slave connects but does not move: verify arm enable state, CAN traffic on Computer 2, and that the master and slave are not connected to the same CAN bus.
 - Gripper errors: gripper validation is isolated, so joint updates continue even if gripper feedback/commands are unavailable.
 - After an exception or Ctrl+C: run `python slave_release.py`, power-cycle if necessary, then bring CAN up again.
 

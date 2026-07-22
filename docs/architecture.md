@@ -14,11 +14,11 @@ separate CAN buses.
 This repository replaces the shared CAN bus with a software bridge:
 
 ```text
-Master Piper -> Computer 1 CAN -> decoded targets -> UDP -> Computer 2 -> piper_sdk -> Slave Piper
+Master PiPER-X -> Computer 1 CAN -> decoded targets -> UDP -> Computer 2 -> pyAgxArm -> Slave PiPER-X
 ```
 
-Computer 1 reads the master command frames from its local SocketCAN interface.
-It decodes the relevant Piper command IDs:
+Computer 1 reads PiPER-X leader joint feedback through pyAgxArm. For the legacy
+standard PiPER profile, it can still decode the relevant Piper command IDs:
 
 - `0x151`: mode/control frame.
 - `0x155`: joint 1 and joint 2 targets.
@@ -28,8 +28,9 @@ It decodes the relevant Piper command IDs:
 
 Computer 2 receives UDP packets, validates them, applies deadman and sequence
 ordering checks, tracks receiver-side monotonic timeout state, and immediately
-calls `piper_sdk` methods such as `JointCtrl()` and `GripperCtrl()` with the
-latest valid target.
+calls the configured arm adapter. The PiPER-X adapter uses pyAgxArm
+`move_js()` for continuous joint target streaming and AGX gripper
+`move_gripper_m()` for received gripper width/force commands.
 
 ## Why Send Decoded Joint Targets
 

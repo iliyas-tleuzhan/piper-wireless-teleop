@@ -18,8 +18,8 @@ Use `scripts/test_udp.py` before involving either robot.
 
 ## Slave Not Moving
 
-Confirm the slave command includes `--confirm MOVE`, the master command includes
-`--deadman`, `piper_sdk` is installed, CAN is configured, and the slave is not
+Confirm the master command includes
+`--deadman`, the configured AgileX SDK is installed, CAN is configured, and the slave is not
 printing receiver-timeout or deadman warnings.
 
 ## Packets Arrive, Gripper Moves, Joints Do Not
@@ -44,7 +44,7 @@ Recovery:
 4. If joints still do not move, run `PYTHONPATH=. python slave_release.py`.
 5. If joints still do not move, fully power-cycle/unplug/replug the slave Piper
    arm.
-6. Run `PYTHONPATH=. python scripts/test_slave_small_move.py --can can0 --confirm MOVE`.
+6. Run `PYTHONPATH=. python scripts/test_slave_small_move.py --can can0`.
 7. Then run full teleop again.
 
 Known manual CAN recovery on the slave computer:
@@ -58,19 +58,19 @@ sudo ip link set can0 up
 Normal slave receiver command:
 
 ```bash
-PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0
 ```
 
 Disable automatic CAN reset:
 
 ```bash
-PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE --no-reset-can-on-exit
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --no-reset-can-on-exit
 ```
 
 Reset CAN before start too:
 
 ```bash
-PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE --reset-can-before-start
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --reset-can-before-start
 ```
 
 ## Slave Movement Delayed

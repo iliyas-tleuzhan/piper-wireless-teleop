@@ -2,10 +2,10 @@
 """Receive master UDP targets and command the slave Piper arm.
 
 Run this on Computer 2, connected only to the slave Piper CAN bus. Movement is
-refused unless ``--confirm MOVE`` is passed. Incoming targets are checked for
-deadman, sequence ordering, and shape, then commanded immediately through
-``piper_sdk``. Optional slew limiting is disabled by default because the normal
-wireless bridge should follow the latest master target like wired teleoperation.
+allowed as soon as the script starts. Incoming targets are checked for deadman,
+sequence ordering, and shape, then commanded immediately through the configured
+SDK. Optional slew limiting is disabled by default because the normal wireless
+bridge should follow the latest master target like wired teleoperation.
 """
 
 from __future__ import annotations
@@ -57,11 +57,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", default="configs/default.yaml", help="YAML config path")
     parser.add_argument("--bind-ip", default="0.0.0.0", help="UDP bind address")
     parser.add_argument("--udp-port", type=int, default=None, help="UDP listen port")
-    parser.add_argument("--confirm", default="", help="Must be MOVE to allow robot motion")
     parser.add_argument(
         "--reset-can-before-start",
         action="store_true",
-        help="Reset the slave CAN interface before connecting to piper_sdk",
+        help="Reset the slave CAN interface before connecting to the configured SDK",
     )
     parser.add_argument(
         "--reset-can-on-exit",
@@ -380,9 +379,6 @@ def main() -> None:
     """Run the UDP-to-Piper slave bridge."""
 
     args = parse_args()
-    if args.confirm != "MOVE":
-        raise SystemExit("Refusing to move robot. Re-run with --confirm MOVE.")
-
     config = load_config(Path(args.config))
     can_interface = args.can or config.can.interface
     udp_port = args.udp_port or config.network.udp_port

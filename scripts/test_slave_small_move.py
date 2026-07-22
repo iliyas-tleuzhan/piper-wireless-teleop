@@ -2,7 +2,7 @@
 """Hardware validation script that moves slave joint 6 by 1 degree.
 
 This script commands real motion and is intentionally not part of normal
-teleoperation. It requires ``--confirm MOVE`` and should only be run with an
+teleoperation. It should only be run with an
 E-stop or power switch nearby and the workspace clear.
 """
 
@@ -23,15 +23,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--can", default=None)
     parser.add_argument("--config", default="configs/default.yaml")
-    parser.add_argument("--confirm", default="")
     args = parser.parse_args()
-
-    if args.confirm != "MOVE":
-        raise SystemExit("Refusing to move robot. Re-run with --confirm MOVE.")
 
     config = load_config(Path(args.config))
     can_interface = args.can or config.can.interface
-    writer = PiperSlaveWriter(can_interface, config.piper)
+    writer = PiperSlaveWriter(
+        can_interface,
+        config.piper,
+        config.arm_profile,
+        bitrate=config.can.bitrate,
+        sdk_interface=config.can.sdk_interface,
+    )
 
     print("[SMALL-MOVE] Keep E-stop/power within reach. Moving J6 by 1 degree.", flush=True)
     writer.connect()
@@ -47,7 +49,10 @@ def main() -> None:
     step = deg_to_raw(0.1)
     commanded = current
     while commanded != target:
-        commanded = clamp_joints_raw(limit_step_raw(commanded, target, step))
+        commanded = clamp_joints_raw(
+            limit_step_raw(commanded, target, step),
+            config.arm_profile,
+        )
         writer.send_joints(commanded)
         time.sleep(0.05)
     print("[SMALL-MOVE] complete", flush=True)

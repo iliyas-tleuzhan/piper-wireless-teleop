@@ -24,12 +24,12 @@ PYTHONPATH=. python scripts/master_sender.py --can can0 --target-ip <COMPUTER_2_
 ## `scripts/slave_receiver.py`
 
 Runs on Computer 2. Receives UDP packets, validates them, and commands the latest
-valid target through `piper_sdk` after startup initialization.
+valid target through the configured AgileX SDK adapter after startup initialization.
 
-Moves robot: yes. Requires `--confirm MOVE`.
+Moves robot: yes. No confirmation argument.
 
 ```bash
-PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE
+PYTHONPATH=. python scripts/slave_receiver.py --can can0
 ```
 
 Default startup mode is `--init-mode align`. It silently samples the current
@@ -41,8 +41,8 @@ gripper is ignored until teleop starts.
 Other modes:
 
 ```bash
-PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE --init-mode offset
-PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE --init-mode none
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --init-mode offset
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --init-mode none
 ```
 
 `offset` records the sampled current startup poses and commands
@@ -65,10 +65,10 @@ PYTHONPATH=. python scripts/no_gripper_master.py --can can0 --target-ip <COMPUTE
 Runs on Computer 2. Receives UDP packets and commands only the slave arm joints;
 incoming or absent gripper targets are ignored.
 
-Moves robot: yes. Requires `--confirm MOVE`.
+Moves robot: yes. No confirmation argument.
 
 ```bash
-PYTHONPATH=. python scripts/no_gripper_slave.py --can can0 --confirm MOVE
+PYTHONPATH=. python scripts/no_gripper_slave.py --can can0
 ```
 
 This script uses the same default `--init-mode align` startup as
@@ -102,10 +102,10 @@ PYTHONPATH=. python scripts/read_slave_state.py --can can0
 Runs on Computer 2. Hardware validation that enables the arm and moves joint 6
 by 1 degree slowly.
 
-Moves robot: yes. Requires `--confirm MOVE`.
+Moves robot: yes. No confirmation argument.
 
 ```bash
-PYTHONPATH=. python scripts/test_slave_small_move.py --can can0 --confirm MOVE
+PYTHONPATH=. python scripts/test_slave_small_move.py --can can0
 ```
 
 ## `scripts/test_udp.py`

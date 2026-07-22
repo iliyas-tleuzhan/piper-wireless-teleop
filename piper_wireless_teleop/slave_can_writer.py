@@ -109,9 +109,12 @@ class PiperSlaveWriter:
             set_motion_mode = getattr(self.piper, "set_motion_mode", None)
             options = getattr(self.piper, "OPTIONS", None)
             motion_options = getattr(options, "MOTION_MODE", None) if options is not None else None
-            joint_mode = getattr(motion_options, "J", None)
-            if callable(set_motion_mode) and joint_mode is not None:
-                set_motion_mode(joint_mode)
+            stream_mode = getattr(motion_options, "JS", None)
+            if callable(set_motion_mode) and stream_mode is not None:
+                set_motion_mode(stream_mode)
+            set_auto_mode = getattr(self.piper, "set_auto_set_motion_mode_enabled", None)
+            if callable(set_auto_mode):
+                set_auto_mode(False)
             return
 
         if hasattr(self.piper, "MotionCtrl_2"):
@@ -137,7 +140,7 @@ class PiperSlaveWriter:
         if len(joints_raw) != 6:
             raise ValueError("JointCtrl requires exactly 6 joint values")
         if self.arm_profile.sdk == "pyAgxArm":
-            self.piper.move_j([raw_to_rad(value) for value in joints_raw])
+            self.piper.move_js([raw_to_rad(value) for value in joints_raw])
             return
         self.piper.JointCtrl(*[int(value) for value in joints_raw])
 

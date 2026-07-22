@@ -67,7 +67,7 @@ class PiperXMasterReader:
     def read_state(self) -> tuple[list[int], dict[str, int] | None]:
         """Read validated six-joint-plus-gripper feedback."""
 
-        feedback = self.robot.get_joint_angles()
+        feedback = self._read_master_joint_feedback()
         joints_rad = extract_message_payload(feedback)
         joints_raw = radians_payload_to_raw(joints_rad)
         validate_joints_in_limits(joints_raw, self.profile)
@@ -86,6 +86,16 @@ class PiperXMasterReader:
 
         gripper = self._read_gripper()
         return joints_raw, gripper
+
+    def _read_master_joint_feedback(self) -> Any:
+        """Read leader joint frames from a physical master arm."""
+
+        leader_method = getattr(self.robot, "get_leader_joint_angles", None)
+        if callable(leader_method):
+            feedback = leader_method()
+            if feedback is not None:
+                return feedback
+        raise ValueError("missing PiPER-X leader joint feedback")
 
     def _read_gripper(self) -> dict[str, int] | None:
         if self._effector is None:

@@ -2,9 +2,9 @@
 """Receive master UDP targets and command the slave Piper arm without gripper motion.
 
 Run this on Computer 2, connected only to the slave Piper CAN bus. Movement is
-refused unless ``--confirm MOVE`` is passed. Incoming targets are checked for
+allowed as soon as the script starts. Incoming targets are checked for
 deadman, sequence ordering, and shape, then commanded immediately through
-``piper_sdk``. Optional slew limiting is disabled by default because the normal
+the configured SDK. Optional slew limiting is disabled by default because the normal
 wireless bridge should follow the latest master target like wired teleoperation.
 
 This variant intentionally ignores any gripper targets, for setups where the
@@ -40,7 +40,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", default="configs/default.yaml", help="YAML config path")
     parser.add_argument("--bind-ip", default="0.0.0.0", help="UDP bind address")
     parser.add_argument("--udp-port", type=int, default=None, help="UDP listen port")
-    parser.add_argument("--confirm", default="", help="Must be MOVE to allow robot motion")
     parser.add_argument(
         "--init-mode",
         choices=("align", "offset", "none"),
@@ -73,6 +72,7 @@ def choose_command_joints(
     last_commanded_joints: list[int] | None,
     target_joints: list[int],
     safety_config: SafetyConfig,
+    profile,
 ) -> list[int]:
     """Choose the slave command for a target packet.
 
@@ -83,27 +83,30 @@ def choose_command_joints(
     """
 
     if not safety_config.enable_slew_limit or last_commanded_joints is None:
-        return clamp_joints_raw(target_joints)
+        return clamp_joints_raw(target_joints, profile)
 
     max_step_raw = deg_to_raw(safety_config.max_step_deg)
-    return clamp_joints_raw(limit_step_raw(last_commanded_joints, target_joints, max_step_raw))
+    return clamp_joints_raw(limit_step_raw(last_commanded_joints, target_joints, max_step_raw), profile)
 
 
 def main() -> None:
     """Run the UDP-to-Piper slave bridge without gripper commands."""
 
     args = parse_args()
-    if args.confirm != "MOVE":
-        raise SystemExit("Refusing to move robot. Re-run with --confirm MOVE.")
-
     config = load_config(Path(args.config))
     can_interface = args.can or config.can.interface
     udp_port = args.udp_port or config.network.udp_port
 
     receiver = UdpReceiver(args.bind_ip, udp_port, config.network.socket_timeout_s)
-    writer = PiperSlaveWriter(can_interface, config.piper)
+    writer = PiperSlaveWriter(
+        can_interface,
+        config.piper,
+        config.arm_profile,
+        bitrate=config.can.bitrate,
+        sdk_interface=config.can.sdk_interface,
+    )
     status = RateLimitedPrinter(config.network.status_rate_hz)
-    tracker = SlavePacketTracker()
+    tracker = SlavePacketTracker(config.arm_profile)
 
     print(f"[SLAVE] Listening on {args.bind_ip}:{udp_port}", flush=True)
     print(f"[SLAVE] Connecting to slave Piper on {can_interface}", flush=True)
@@ -169,6 +172,7 @@ def main() -> None:
                 last_commanded_joints=last_commanded_joints,
                 target_joints=command_target_joints,
                 safety_config=config.safety,
+                profile=config.arm_profile,
             )
             writer.send_joints(next_joints)
 

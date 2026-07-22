@@ -133,7 +133,7 @@ PIPER_X_PROFILE = ArmProfile(
     name="piper_x",
     sdk="pyAgxArm",
     sdk_robot="piper_x",
-    sdk_firmware="default",
+    sdk_firmware="v189",
     joint_profiles=(
         JointProfile("joint1", -150.0, 150.0),
         JointProfile("joint2", 0.0, 180.0),

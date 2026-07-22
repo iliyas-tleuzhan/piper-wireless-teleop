@@ -14,17 +14,17 @@
 ## Computer 2: Slave Receiver
 
 ```bash
-PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0
 ```
 
 `--init-mode align` is the default. Startup automatically waits for close poses:
 
 1. The receiver connects to the slave Piper, enables it, and sets the configured
-   joint control/high-follow mode.
+   streaming joint mode.
 2. The operator visually moves both arms into the same safe starting pose.
 3. The receiver silently samples current master packets for about 0.5 seconds
    and uses the latest one, then reads about 0.5 seconds of stable slave
-   feedback from `GetArmJointMsgs()`, discarding initial/default all-zero
+   feedback from the configured SDK, discarding initial/default all-zero
    feedback frames.
 4. If any joint is more than 15 degrees apart, initialization stays silent and
    keeps checking current master/current slave positions.
@@ -41,17 +41,17 @@ than 15 degrees per joint.
 Optional overrides:
 
 ```bash
-PYTHONPATH=. python scripts/slave_receiver.py --config configs/default.yaml --bind-ip 0.0.0.0 --udp-port 5005 --can can0 --confirm MOVE
+PYTHONPATH=. python scripts/slave_receiver.py --config configs/default.yaml --bind-ip 0.0.0.0 --udp-port 5005 --can can0
 ```
 
 Startup mode overrides:
 
 ```bash
 # No startup correction. Teleop uses slave_init_current + (master_current - master_init_current).
-PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE --init-mode offset
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --init-mode offset
 
 # Check current poses, skip slow correction, then start absolute teleop.
-PYTHONPATH=. python scripts/slave_receiver.py --can can0 --confirm MOVE --init-mode none
+PYTHONPATH=. python scripts/slave_receiver.py --can can0 --init-mode none
 ```
 
 ## Computer 1: Master Sender
