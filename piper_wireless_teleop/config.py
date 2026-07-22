@@ -12,6 +12,8 @@ from typing import Any
 
 import yaml
 
+from .arm_profile import ArmProfile, get_arm_profile
+
 
 @dataclass(frozen=True)
 class NetworkConfig:
@@ -40,6 +42,7 @@ class CanConfig:
 
     bitrate: int
     interface: str
+    sdk_interface: str
 
 
 @dataclass(frozen=True)
@@ -80,6 +83,7 @@ class AppConfig:
     piper: PiperConfig
     safety: SafetyConfig
     logging: LoggingConfig
+    arm_profile: ArmProfile
 
 
 def _parse_int(value: Any) -> int:
@@ -100,6 +104,7 @@ def load_config(path: str | Path) -> AppConfig:
         raw = yaml.safe_load(handle) or {}
 
     network_raw = raw["network"]
+    arm_raw = raw.get("arm", {})
     logging_raw = raw.get("logging", {})
     safety_raw = raw.get("safety", {})
     receiver_timeout_s = network_raw.get(
@@ -110,6 +115,8 @@ def load_config(path: str | Path) -> AppConfig:
         "status_rate_hz",
         logging_raw.get("status_hz", 2),
     )
+
+    arm_profile = get_arm_profile(str(arm_raw.get("profile", "piper_x")))
 
     return AppConfig(
         network=NetworkConfig(
@@ -122,6 +129,7 @@ def load_config(path: str | Path) -> AppConfig:
         can=CanConfig(
             bitrate=int(raw["can"]["bitrate"]),
             interface=str(raw["can"]["interface"]),
+            sdk_interface=str(raw["can"].get("sdk_interface", "socketcan")),
         ),
         piper=PiperConfig(
             control_mode=_parse_int(raw["piper"]["control_mode"]),
@@ -140,4 +148,5 @@ def load_config(path: str | Path) -> AppConfig:
             status_hz=float(status_rate_hz),
             verbose_packets=bool(logging_raw.get("verbose_packets", False)),
         ),
+        arm_profile=arm_profile,
     )

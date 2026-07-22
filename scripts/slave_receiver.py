@@ -27,8 +27,9 @@ from piper_wireless_teleop.safety import (
     deg_to_raw,
     limit_step_raw,
     raw_to_deg,
+    validate_gripper_packet,
 )
-from piper_wireless_teleop.slave_can_writer import PiperSlaveWriter
+from piper_wireless_teleop.slave_can_writer import PiperSlaveWriter, extract_pyagxarm_feedback_raw
 from piper_wireless_teleop.udp_transport import UdpReceiver
 
 ALIGN_THRESHOLD_DEG = 15.0
@@ -107,6 +108,7 @@ def choose_command_joints(
     last_commanded_joints: list[int] | None,
     target_joints: list[int],
     safety_config: SafetyConfig,
+    profile: Any,
 ) -> list[int]:
     """Choose the slave command for a target packet.
 
@@ -117,10 +119,10 @@ def choose_command_joints(
     """
 
     if not safety_config.enable_slew_limit or last_commanded_joints is None:
-        return clamp_joints_raw(target_joints)
+        return clamp_joints_raw(target_joints, profile)
 
     max_step_raw = deg_to_raw(safety_config.max_step_deg)
-    return clamp_joints_raw(limit_step_raw(last_commanded_joints, target_joints, max_step_raw))
+    return clamp_joints_raw(limit_step_raw(last_commanded_joints, target_joints, max_step_raw), profile)
 
 
 def apply_offset_command(
@@ -144,6 +146,9 @@ def apply_offset_command(
 def extract_feedback_joints_raw(feedback: Any) -> list[int] | None:
     """Extract six 0.001-degree joint values from common Piper feedback shapes."""
 
+    pyagxarm_feedback = extract_pyagxarm_feedback_raw(feedback)
+    if pyagxarm_feedback is not None:
+        return pyagxarm_feedback
     visited: set[int] = set()
     return _extract_feedback_joints_raw(feedback, visited)
 
@@ -232,7 +237,7 @@ def read_stable_slave_feedback(writer: PiperSlaveWriter) -> list[int]:
             time.sleep(ALIGN_TICK_S)
             continue
 
-        latest = clamp_joints_raw(joints)
+        latest = joints
         now_s = time.monotonic()
         if sample_started_s is None:
             sample_started_s = now_s
@@ -304,11 +309,12 @@ def slowly_align_slave_to_master_current(
     writer: PiperSlaveWriter,
     slave_current: Sequence[int],
     master_current: Sequence[int],
+    profile: Any,
 ) -> bool:
     """Slowly move the slave from current feedback pose to current master pose."""
 
-    commanded = clamp_joints_raw(slave_current)
-    target = clamp_joints_raw(master_current)
+    commanded = clamp_joints_raw(slave_current, profile)
+    target = clamp_joints_raw(master_current, profile)
     max_step_raw = deg_to_raw(ALIGN_STEP_DEG)
     close_raw = deg_to_raw(0.5)
     start_s = time.monotonic()
@@ -322,7 +328,7 @@ def slowly_align_slave_to_master_current(
         if now_s - start_s > ALIGN_TIMEOUT_S:
             return False
 
-        commanded = clamp_joints_raw(limit_step_raw(commanded, target, max_step_raw))
+        commanded = clamp_joints_raw(limit_step_raw(commanded, target, max_step_raw), profile)
         writer.send_joints(commanded)
         time.sleep(ALIGN_TICK_S)
 
@@ -361,6 +367,7 @@ def initialize_teleop(
             writer=writer,
             slave_current=slave_current,
             master_current=master_current,
+            profile=writer.arm_profile,
         ):
             return StartupInit(
                 mode="align",
@@ -387,9 +394,15 @@ def main() -> None:
             reset_can_interface(can_interface, config.can.bitrate)
 
         receiver = UdpReceiver(args.bind_ip, udp_port, config.network.socket_timeout_s)
-        writer = PiperSlaveWriter(can_interface, config.piper)
+        writer = PiperSlaveWriter(
+            can_interface,
+            config.piper,
+            config.arm_profile,
+            bitrate=config.can.bitrate,
+            sdk_interface=config.can.sdk_interface,
+        )
         status = RateLimitedPrinter(config.network.status_rate_hz)
-        tracker = SlavePacketTracker()
+        tracker = SlavePacketTracker(config.arm_profile)
 
         print(f"[SLAVE] Listening on {args.bind_ip}:{udp_port}", flush=True)
         print(f"[SLAVE] Connecting to slave Piper on {can_interface}", flush=True)
@@ -454,18 +467,18 @@ def main() -> None:
                 last_commanded_joints=last_commanded_joints,
                 target_joints=command_target_joints,
                 safety_config=config.safety,
+                profile=config.arm_profile,
             )
             writer.send_joints(next_joints)
 
             gripper = packet.get("gripper")
-            if isinstance(gripper, dict):
-                writer.send_gripper(
-                    {
-                        "angle": int(gripper.get("angle", 0)),
-                        "effort": int(gripper.get("effort", config.piper.gripper_default_effort)),
-                        "code": int(gripper.get("code", 1)),
-                    }
-                )
+            try:
+                valid_gripper = validate_gripper_packet(gripper, config.arm_profile)
+            except ValueError as exc:
+                status.print(f"[SLAVE] Ignoring gripper command: {exc}")
+                valid_gripper = None
+            if valid_gripper is not None:
+                writer.send_gripper(valid_gripper)
 
             last_commanded_joints = next_joints
             command_rate_hz = tracker.command_rate_hz(time.monotonic())
@@ -490,6 +503,12 @@ def main() -> None:
     except KeyboardInterrupt:
         print("\n[SLAVE] stopped", flush=True)
     finally:
+        if "writer" in locals():
+            try:
+                writer.disable()
+                writer.close()
+            except Exception as exc:
+                print(f"[SLAVE] safe disable warning: {exc}", flush=True)
         if receiver is not None:
             receiver.close()
         if args.reset_can_on_exit:

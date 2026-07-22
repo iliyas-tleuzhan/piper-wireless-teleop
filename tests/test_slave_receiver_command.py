@@ -1,6 +1,7 @@
 """Tests for slave receiver command selection without Piper hardware."""
 
 from piper_wireless_teleop.config import SafetyConfig
+from piper_wireless_teleop.arm_profile import PIPER_X_PROFILE
 from scripts.slave_receiver import (
     apply_offset_command,
     choose_command_joints,
@@ -22,12 +23,13 @@ def safety_config(enable_slew_limit: bool) -> SafetyConfig:
 def test_default_command_path_passes_latest_target_directly() -> None:
     """Large normal target changes are not artificially slowed by default."""
 
-    target = [150000, 180000, -170000, 100000, 70000, -100000]
+    target = [150000, 180000, -170000, 80000, 70000, -100000]
 
     assert choose_command_joints(
         last_commanded_joints=[0, 0, 0, 0, 0, 0],
         target_joints=target,
         safety_config=safety_config(enable_slew_limit=False),
+        profile=PIPER_X_PROFILE,
     ) == target
 
 
@@ -38,6 +40,7 @@ def test_optional_slew_limit_only_when_enabled() -> None:
         last_commanded_joints=[0, 0, 0, 0, 0, 0],
         target_joints=[10000, 0, 0, 0, 0, 0],
         safety_config=safety_config(enable_slew_limit=True),
+        profile=PIPER_X_PROFILE,
     ) == [3000, 0, 0, 0, 0, 0]
 
 

@@ -8,6 +8,10 @@ network:
 can:
   bitrate: 1000000
   interface: can0
+  sdk_interface: socketcan
+
+arm:
+  profile: piper_x
 
 piper:
   control_mode: 0x01

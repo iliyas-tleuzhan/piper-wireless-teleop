@@ -7,38 +7,22 @@ and provide optional step-limiting primitives for explicit fallback use.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 
-RAW_UNITS_PER_DEGREE = 1000
+from .arm_profile import PIPER_X_PROFILE, ArmProfile, deg_to_raw, raw_to_deg
 
-JOINT_LIMITS_RAW: tuple[tuple[int, int], ...] = (
-    (-154000, 154000),
-    (0, 195000),
-    (-175000, 0),
-    (-106000, 106000),
-    (-75000, 75000),
-    (-100000, 100000),
-)
+JOINT_LIMITS_RAW = PIPER_X_PROFILE.joint_limits_raw
 
 
-def raw_to_deg(value: int | float) -> float:
-    """Convert Piper raw joint units to degrees."""
-
-    return float(value) / RAW_UNITS_PER_DEGREE
-
-
-def deg_to_raw(value: int | float) -> int:
-    """Convert degrees to Piper raw joint units."""
-
-    return int(round(float(value) * RAW_UNITS_PER_DEGREE))
-
-
-def clamp_joints_raw(joints: Sequence[int]) -> list[int]:
+def clamp_joints_raw(
+    joints: Sequence[int], profile: ArmProfile = PIPER_X_PROFILE
+) -> list[int]:
     """Clamp six raw joint targets to Piper joint limits."""
 
     validate_joints_raw(joints)
     clamped: list[int] = []
-    for value, (low, high) in zip(joints, JOINT_LIMITS_RAW, strict=True):
+    for value, (low, high) in zip(joints, profile.joint_limits_raw, strict=True):
         clamped.append(max(low, min(high, int(value))))
     return clamped
 
@@ -70,11 +54,58 @@ def validate_joints_raw(joints: Sequence[object]) -> None:
     if len(joints) != 6:
         raise ValueError("joints must contain exactly 6 values")
     for value in joints:
-        if not isinstance(value, int):
+        if isinstance(value, bool) or not isinstance(value, int):
             raise ValueError("joint values must be integers in Piper raw units")
 
 
-def validate_joint_packet(packet: dict[str, object]) -> list[int]:
+def validate_joints_in_limits(
+    joints: Sequence[int], profile: ArmProfile = PIPER_X_PROFILE
+) -> None:
+    """Validate that raw joints are finite integers inside profile limits."""
+
+    validate_joints_raw(joints)
+    for index, (value, (low, high)) in enumerate(
+        zip(joints, profile.joint_limits_raw, strict=True), start=1
+    ):
+        if not math.isfinite(float(value)):
+            raise ValueError(f"joint{index} is not finite")
+        if not low <= int(value) <= high:
+            raise ValueError(
+                f"joint{index}={value} outside {profile.name} limit [{low}, {high}]"
+            )
+
+
+def validate_gripper_packet(
+    gripper: object, profile: ArmProfile = PIPER_X_PROFILE
+) -> dict[str, int] | None:
+    """Validate an optional gripper command without blocking joint updates."""
+
+    if gripper is None:
+        return None
+    if not isinstance(gripper, dict):
+        raise ValueError("gripper must be an object when present")
+    angle = gripper.get("angle", 0)
+    effort = gripper.get("effort", 0)
+    code = gripper.get("code", 1)
+    if (
+        isinstance(angle, bool)
+        or isinstance(effort, bool)
+        or isinstance(code, bool)
+        or not isinstance(angle, int)
+        or not isinstance(effort, int)
+        or not isinstance(code, int)
+    ):
+        raise ValueError("gripper angle, effort and code must be integers")
+    if not profile.gripper_min_raw <= angle <= profile.gripper_max_raw:
+        raise ValueError("gripper angle outside configured range")
+    if not profile.gripper_force_min <= effort <= profile.gripper_force_max:
+        raise ValueError("gripper effort outside configured range")
+    return {"angle": angle, "effort": effort, "code": code}
+
+
+def validate_joint_packet(
+    packet: dict[str, object], profile: ArmProfile = PIPER_X_PROFILE
+) -> list[int]:
     """Validate a decoded teleop packet and return its raw joint list."""
 
     if packet.get("type") != "piper_joint_targets":
@@ -88,5 +119,5 @@ def validate_joint_packet(packet: dict[str, object]) -> list[int]:
     joints = packet.get("joints")
     if not isinstance(joints, list):
         raise ValueError("packet joints field is missing or invalid")
-    validate_joints_raw(joints)
+    validate_joints_in_limits(joints, profile)
     return [int(value) for value in joints]

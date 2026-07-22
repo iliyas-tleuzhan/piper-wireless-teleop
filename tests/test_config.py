@@ -10,6 +10,8 @@ def test_default_config_commands_directly() -> None:
 
     assert config.network.receiver_timeout_s == 0.5
     assert config.network.status_rate_hz == 2
+    assert config.can.sdk_interface == "socketcan"
+    assert config.arm_profile.name == "piper_x"
     assert not config.safety.enable_slew_limit
     assert not config.safety.startup_sync_required
     assert config.piper.speed_percent == 100

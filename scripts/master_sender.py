@@ -22,6 +22,7 @@ from piper_wireless_teleop.master_can_reader import (
     MasterCommandState,
     decode_master_frame,
 )
+from piper_wireless_teleop.master_arm_reader import PiperXMasterReader
 from piper_wireless_teleop.packet import encode_packet, make_packet
 from piper_wireless_teleop.udp_transport import UdpSender
 
@@ -47,34 +48,64 @@ def main() -> None:
     target_port = args.target_port or config.network.udp_port
     send_interval_s = 1.0 / config.network.send_rate_hz
 
-    bus = can.interface.Bus(channel=can_interface, interface="socketcan")
     sender = UdpSender(args.target_ip, target_port)
     status = RateLimitedPrinter(config.network.status_rate_hz)
+    bus = None
+    piper_x_reader = None
     state = MasterCommandState()
 
     sequence = 0
     next_send = time.monotonic()
 
-    print(f"[MASTER] Reading master Piper CAN frames from {can_interface}", flush=True)
+    print(
+        f"[MASTER] profile={config.arm_profile.name} can={can_interface} "
+        f"bitrate={config.can.bitrate}",
+        flush=True,
+    )
     print(f"[MASTER] Sending UDP to {args.target_ip}:{target_port}", flush=True)
-    print("[MASTER] Waiting for complete 0x155/0x156/0x157 joint target set", flush=True)
+
+    if config.arm_profile.sdk == "pyAgxArm":
+        piper_x_reader = PiperXMasterReader(
+            can_interface=can_interface,
+            can_bitrate=config.can.bitrate,
+            sdk_interface=config.can.sdk_interface,
+            profile=config.arm_profile,
+        )
+        piper_x_reader.connect()
+        print("[MASTER] Reading PiPER-X master feedback through pyAgxArm", flush=True)
+    else:
+        bus = can.interface.Bus(channel=can_interface, interface="socketcan")
+        print("[MASTER] Waiting for complete 0x155/0x156/0x157 joint target set", flush=True)
 
     try:
         while True:
-            # Keep the receive timeout short so fixed-rate UDP sending is not
-            # blocked waiting for new CAN traffic.
-            message = bus.recv(timeout=config.network.socket_timeout_s)
-            if message is not None and message.arbitration_id in MASTER_CAN_IDS:
-                decode_master_frame(message, state)
+            if bus is not None:
+                # Keep the receive timeout short so fixed-rate UDP sending is not
+                # blocked waiting for new CAN traffic.
+                message = bus.recv(timeout=config.network.socket_timeout_s)
+                if message is not None and message.arbitration_id in MASTER_CAN_IDS:
+                    decode_master_frame(message, state)
 
             now = time.monotonic()
             if now < next_send:
                 continue
 
-            if not state.has_full_joint_target():
+            if piper_x_reader is not None:
+                try:
+                    joints_raw, gripper = piper_x_reader.read_state()
+                except (ValueError, TimeoutError) as exc:
+                    status.print(f"[MASTER] Waiting for valid PiPER-X feedback: {exc}")
+                    next_send = now + send_interval_s
+                    continue
+                mode_frame = None
+            elif not state.has_full_joint_target():
                 status.print("[MASTER] Waiting for complete joint target frames")
                 next_send = now + send_interval_s
                 continue
+            else:
+                joints_raw = state.joints_raw()
+                gripper = state.gripper
+                mode_frame = state.mode_frame
 
             # Sender wall-clock timestamp is kept only for log correlation. The
             # slave uses receiver-side monotonic time for safety timeouts.
@@ -83,9 +114,9 @@ def main() -> None:
                 sequence=sequence,
                 timestamp=timestamp,
                 deadman=args.deadman,
-                joints_raw=state.joints_raw(),
-                gripper=state.gripper,
-                mode_frame=state.mode_frame,
+                joints_raw=joints_raw,
+                gripper=gripper,
+                mode_frame=mode_frame,
             )
             sender.send(encode_packet(packet))
 
@@ -104,9 +135,12 @@ def main() -> None:
         print("\n[MASTER] stopped", flush=True)
     finally:
         sender.close()
-        shutdown = getattr(bus, "shutdown", None)
-        if callable(shutdown):
-            shutdown()
+        if piper_x_reader is not None:
+            piper_x_reader.close()
+        if bus is not None:
+            shutdown = getattr(bus, "shutdown", None)
+            if callable(shutdown):
+                shutdown()
 
 
 if __name__ == "__main__":

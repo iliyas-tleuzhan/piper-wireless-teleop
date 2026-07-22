@@ -11,7 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .safety import clamp_joints_raw, validate_joint_packet
+from .arm_profile import PIPER_X_PROFILE, ArmProfile
+from .safety import validate_joint_packet
 
 
 @dataclass(frozen=True)
@@ -32,7 +33,8 @@ class PacketDecision:
 class SlavePacketTracker:
     """Track valid slave packets using receiver monotonic time."""
 
-    def __init__(self) -> None:
+    def __init__(self, profile: ArmProfile = PIPER_X_PROFILE) -> None:
+        self.profile = profile
         self.last_seq: int | None = None
         self.total_dropped = 0
         self.last_valid_rx_time_s: float | None = None
@@ -44,7 +46,7 @@ class SlavePacketTracker:
         """Validate one packet and update ordering state if it is usable."""
 
         try:
-            target_joints = clamp_joints_raw(validate_joint_packet(packet))
+            target_joints = validate_joint_packet(packet, self.profile)
         except (TypeError, ValueError) as exc:
             return PacketDecision(accepted=False, reason=f"malformed packet: {exc}")
 
