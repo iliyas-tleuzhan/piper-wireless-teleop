@@ -1,212 +1,136 @@
-# piper-wireless-teleop
+# Dual Piper-X wireless teleoperation
 
-Wireless teleoperation bridge for two AgileX Piper robotic arms using the
-official `piper_sdk`.
+Two master Piper-X arms on a Raspberry Pi 5 send joint/gripper targets over
+UDP/Wi-Fi to two slave arms on an NVIDIA Orin. One worker per arm keeps routing,
+packet tracking and startup alignment separate. Bunker Mini chassis control and
+LoRa transport are outside this repository's dual-arm runtime.
 
-Architecture:
+## Current setup
 
-```text
-Master Piper arm -> Computer 1 SocketCAN -> UDP/Wi-Fi -> Computer 2 -> SocketCAN -> Slave Piper arm
-```
+| Side | Pi master CAN | Orin slave CAN | UDP port |
+| --- | --- | --- | --- |
+| Left | can0 | can3 | 5005 |
+| Right | can1 | can2 | 5006 |
 
-In wireless mode the master and slave arms must not be connected to the same CAN
-bus. Computer 1 connects only to the master Piper. Computer 2 connects only to
-the slave Piper.
+- Pi: Ubuntu Server 24.04 ARM64; SSH `dase-raspberrypi@192.168.1.145`.
+- Orin: Ubuntu 22.04 ARM64; SSH `dase-orin@192.168.1.144`.
+- Each arm has a separate CAN bus at 1 Mbps.
+- Mapping is in [configs/dual_arm.yaml](configs/dual_arm.yaml). Numbered adapter
+  names can change after reboot: confirm the physical mapping before motion.
 
-## Hardware Requirements
+## Minimal downloads
 
-- Two AgileX Piper arms.
-- Two Linux computers with CAN adapters.
-- A Wi-Fi or Ethernet network between the two computers.
-- Accessible E-stop or power cutoff for the slave arm.
+Download the ZIP for each machine; no full repository clone is required:
 
-## Software Requirements
+- [Pi master bundle](bundles/piper-teleop-master.zip): python-can and PyYAML.
+- [Orin slave bundle](bundles/piper-teleop-slave.zip): piper_sdk and PyYAML.
 
-- Linux with SocketCAN.
-- Conda.
-- Python 3.11.
-- `piper_sdk`, `python-can`, `PyYAML`.
-- System packages: `can-utils`, `iproute2`, `net-tools`, `netcat-openbsd`.
+Their dependencies are installed as needed. Bundles exclude tests, Git history,
+Arduino/LoRa firmware and development tools. Each contains its worker, required
+Python modules, configuration, setup scripts and operating guide.
+See [deployment instructions](docs/dual-arm.md) for SCP and update commands.
 
-## Conda Setup
-
-```bash
-conda env create -f environment.yml
-conda activate piper-wireless-teleop
-pip install -r requirements.txt
-```
-
-## CAN Setup
+On each machine install the OS prerequisites once:
 
 ```bash
 sudo apt update
-sudo apt install -y can-utils iproute2 net-tools netcat-openbsd
-chmod +x scripts/setup_can.sh
-./scripts/setup_can.sh can0 1000000
+sudo apt install --no-install-recommends python3-venv iproute2 unzip
 ```
 
-Equivalent manual commands:
+On the Pi, after transferring its ZIP to ~/iliyas:
 
 ```bash
-sudo ip link set can0 down
-sudo ip link set can0 type can bitrate 1000000
-sudo ip link set can0 up
-ip -details link show can0
+cd ~/iliyas
+unzip -o piper-teleop-master.zip
+cd piper-teleop-master
+bash scripts/install_runtime.sh master
+bash scripts/setup_can.sh can0
+bash scripts/setup_can.sh can1
+.venv/bin/python -m piper_wireless_teleop.dual_arm master --target-ip 192.168.1.144 --deadman --dry-run
 ```
 
-## Quick Start
-
-Start Computer 2 first. This side moves the slave arm and requires explicit
-confirmation. The default `--init-mode align` silently waits until the current
-master target and current slave feedback are visually/CAN aligned, then slowly
-aligns the slave before teleop starts. On exit, including after Ctrl+C, the
-slave receiver resets the configured CAN interface by default so the next run
-starts from a cleaner CAN state:
+On the Orin:
 
 ```bash
-PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE
+cd ~/iliyas
+unzip -o piper-teleop-slave.zip
+cd piper-teleop-slave
+bash scripts/install_runtime.sh slave
+bash scripts/setup_can.sh can3
+bash scripts/setup_can.sh can2
+.venv/bin/python -m piper_wireless_teleop.dual_arm slave --dry-run
 ```
 
-Disable automatic CAN reset on exit:
+Use the system Python in a private .venv; Conda is optional and is not required.
+On Ubuntu 22.04, install python3.10-venv if ensurepip is missing.
+
+## Run
+
+Physically align each master/slave pair and keep the slave power cutoff nearby.
+Start the Orin receiver first (from its extracted bundle directory):
 
 ```bash
-PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE --no-reset-can-on-exit
+.venv/bin/python -m piper_wireless_teleop.dual_arm slave --confirm MOVE
 ```
 
-Reset CAN before connecting to the slave Piper too:
+Then start on the Pi:
 
 ```bash
-PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE --reset-can-before-start
+.venv/bin/python -m piper_wireless_teleop.dual_arm master --target-ip 192.168.1.144 --deadman
 ```
 
-Then start Computer 1:
+These commands enable motion. Logs carry LEFT/RIGHT labels. Each receiver waits
+for targets within 15 degrees of the slave feedback pose, then slowly aligns.
+Gripper forwarding begins after initialization. Ctrl+C stops both local workers;
+a local worker exit also stops its sibling. Linux workers receive a single
+supervisor interrupt so cleanup is not interrupted by duplicate terminal signals.
+
+## Behavior and validation status
+
+The sender reads command IDs 0x155/0x156/0x157 and sends at 50 Hz, including while
+the master is stationary. The receiver tracks sequences and uses a local 0.5 s
+UDP timeout; sender/receiver clocks need not match. Network loss stops new commands,
+but does not physically disable motors. The sender keeps its last complete target
+if CAN input disappears. --deadman is a packet flag, not a physical hold-to-run switch.
+
+Local joint clamps use official Piper-X presets in degrees: J1 +/-150, J2 0..180,
+J3 -170..0, J4/J5 +/-89, J6 +/-170. They do not change firmware or SDK limits.
+The backend remains piper_sdk.C_PiperInterface_V2; firmware/SDK compatibility and
+actual slave following are still under investigation. Field logs confirmed two
+accepted UDP streams around 48 Hz and changing left-master CAN targets, but do
+not establish successful physical teleoperation. No collision avoidance or
+synchronized dual-arm execution is implemented.
+
+## Repository structure
+
+| Directory | Purpose |
+| --- | --- |
+| piper_wireless_teleop/ | Runtime modules and dual-arm launcher |
+| configs/ | Runtime settings and left/right mapping |
+| scripts/ | Workers, installer, bundle builder and diagnostics |
+| bundles/ | Ready-to-transfer master/slave ZIPs |
+| docs/ | Deployment, control behavior and troubleshooting |
+| tests/ | Development tests; excluded from deployments |
+| arduino/ | Optional existing Wi-Fi access-point firmware |
+
+Single-pair scripts remain available; see [script reference](docs/scripts.md).
+The older tmux/SSH launcher uses its own single-pair settings; it is not the
+recommended dual-arm launcher. See [safety behavior](docs/safety.md) for details.
+
+## Development and rebuild
 
 ```bash
-PYTHONPATH=. python scripts/master_sender.py --can can0 --target-ip <COMPUTER_2_IP> --deadman
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
+python scripts/build_runtime_bundle.py
 ```
 
-## Run both sides from Computer 1 with tmux + SSH
+The builder writes bundles/ by default and normalizes Linux text line endings.
+Rebuild both ZIPs whenever packaged code/configuration/docs change; use --output
+for a different destination. Tests cover routing, worker imports from extracted
+bundles, Windows line-ending normalization and process supervision. Linux signal
+cleanup also needs testing on the target devices. Dependencies are unpinned;
+record deployed versions for a reproducible installation.
 
-Computer 1 must be able to SSH into Computer 2 first:
-
-```bash
-ssh dase_iot@192.168.50.1
-```
-
-Computer 2 must have an SSH server running:
-
-```bash
-sudo apt install -y openssh-server
-sudo systemctl enable --now ssh
-```
-
-Run the launcher from Computer 1:
-
-```bash
-chmod +x scripts/run_teleop_tmux.sh
-./scripts/run_teleop_tmux.sh
-```
-
-The left tmux pane SSHes into Computer 2 and starts `slave_receiver.py` first.
-The right tmux pane runs on Computer 1 and waits for Enter before starting
-`master_sender.py`.
-
-tmux controls:
-
-```text
-Ctrl+b then arrow key = switch pane
-Ctrl+b then d = detach
-tmux attach -t piper-teleop = reattach
-Ctrl+C = stop the running script in the selected pane
-```
-
-UDP-only test without Piper hardware:
-
-```bash
-# Computer 2
-PYTHONPATH=. python scripts/test_udp.py receiver --bind-ip 0.0.0.0 --port 5005
-
-# Computer 1
-PYTHONPATH=. python scripts/test_udp.py sender --target-ip <COMPUTER_2_IP> --port 5005
-```
-
-## Safety Checklist
-
-- Keep the slave arm power cutoff or E-stop within reach.
-- Power-cycle the slave Piper fresh before important tests.
-- Start with both arms in similar poses.
-- Use the default safe alignment startup. The slave will not move toward the
-  master pose until the visual/CAN alignment check passes.
-- Confirm the master and slave are not on the same CAN bus.
-- Test UDP before enabling robot movement.
-- Check `can0` with `ip -details link show can0` and `candump can0`.
-- Run `PYTHONPATH=. python scripts/test_slave_small_move.py --can can0 --confirm MOVE`.
-- Start `PYTHONPATH=. python scripts/slave_receiver.py --can can0 --bind-ip 0.0.0.0 --confirm MOVE`.
-- Start `PYTHONPATH=. python scripts/master_sender.py --can can0 --target-ip <COMPUTER_2_IP> --deadman`.
-- Move slowly first.
-- Use `--deadman` on the master sender; packets with `deadman=false` are ignored.
-
-## Configuration
-
-Defaults live in `configs/default.yaml`. Normal commands do not include `--speed`
-or `--max-jump-deg`; Piper mode, speed, receiver timeout, and status rate are
-config values. Sender packet timestamps are for debugging only. The slave uses
-receiver-side `time.monotonic()` and sequence numbers, so Computer 1 and
-Computer 2 wall clocks do not need to be synchronized for timeout safety.
-
-Wireless teleop starts in `--init-mode align` by default. During startup, the
-receiver compares the latest master joint target with stable slave feedback from
-`GetArmJointMsgs()`. The master target is sampled silently in short windows so
-queued UDP packets are skipped. Both values are Piper raw units of 0.001 degrees.
-Visual alignment means the operator places both arms in the same safe pose by
-sight; CAN/raw alignment means every joint is within the 15 degree startup
-threshold. If a joint is farther away, the receiver stays in initialization and
-continues checking silently.
-
-After the check passes, the receiver slowly corrects the slave from its current
-feedback pose to the sampled current master pose with small 0.3 degree steps every 20 ms. Gripper
-commands are ignored until normal teleop starts. `--init-mode offset` is
-available as a fallback when you do not want the slave corrected at startup; it commands
-`slave_init_current + (master_current - master_init_current)` during teleop.
-`--init-mode none` still performs the same current master/current slave check,
-then skips the slow correction and starts normal absolute teleop from the
-checked pose.
-
-After initialization, accepted packets are commanded directly to the slave by
-default. Slew limiting is disabled by default because limiting every packet
-makes the slave feel much slower than wired Piper master-slave teleoperation. It
-remains available only as an explicit config fallback with
-`safety.enable_slew_limit`.
-
-Important defaults:
-
-- CAN bitrate: `1000000`
-- UDP port: `5005`
-- Master send rate: `50 Hz`
-- Receiver timeout: `0.5 s`
-- Status output: `2 Hz`
-- Piper speed percent: `100`
-- Follow/high-follow mode: `0xAD`
-- Startup init mode: `align`
-- Startup alignment threshold: `15 deg`
-- Joint hard bounds: J1 `-154..154`, J2 `0..195`, J3 `-175..0`,
-  J4 `-106..106`, J5 `-75..75`, J6 `-100..100` degrees
-- Slew limiting: disabled by default
-
-## Troubleshooting Summary
-
-- `can0` missing: check adapter drivers and run `ip link`.
-- `candump can0` shows nothing: check wiring, bitrate, termination, and power.
-- UDP packets not arriving: verify IP address, firewall, subnet, and port `5005`.
-- Slave not moving: confirm `--confirm MOVE`, `--deadman`, Piper enable state, and
-  that valid packets are arriving before the receiver timeout.
-- Gripper moves but joints do not: the slave Piper controller or CAN interface
-  may be stuck in a stale state. Stop `slave_receiver.py`; it now resets CAN on
-  exit by default. If needed, run the manual CAN reset commands from the CAN
-  Setup section on the slave computer, restart `slave_receiver.py`, then
-  power-cycle the slave arm if joints still ignore commands.
-- Negative packet age: no longer a safety error; sender timestamps are debug-only.
-- Delayed movement: reduce Wi-Fi congestion, avoid verbose packet logging, and
-  keep the control machines close to the access point.
-
-More detail is in `docs/`.
+Work on a development branch and commit as Iliyas. Commit/merge main only when
+explicitly instructed. See [AGENTS.md](AGENTS.md).
