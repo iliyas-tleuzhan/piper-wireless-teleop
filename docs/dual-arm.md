@@ -94,3 +94,11 @@ Development on the laptop: pip install -r requirements-dev.txt; python -m pytest
 Make changes on dual-piper-teleop. Never commit/merge main without instruction.
 Rebuild and transfer bundles after updating. Current dependencies are not pinned;
 record tested versions on the devices before a reproducible deployment release.
+
+## Piper-X joint profile
+Local receiver clamps now use AgileX's Piper-X presets: J1 +/-150, J2 0..180,
+J3 -170..0, J4/J5 +/-89, J6 +/-170 degrees. These do not write firmware limits.
+The existing piper_sdk backend is retained; SDK/firmware compatibility remains
+subject to device checks. No MIT/CPV joint sign correction is applied to this
+JointCtrl position-command path. See the official model presets:
+https://github.com/agilexrobotics/pyAgxArm/blob/master/pyAgxArm/api/constants.py

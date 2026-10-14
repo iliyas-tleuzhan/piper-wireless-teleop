@@ -22,7 +22,7 @@ def safety_config(enable_slew_limit: bool) -> SafetyConfig:
 def test_default_command_path_passes_latest_target_directly() -> None:
     """Large normal target changes are not artificially slowed by default."""
 
-    target = [150000, 180000, -170000, 100000, 70000, -100000]
+    target = [150000, 180000, -170000, 89000, 89000, -170000]
 
     assert choose_command_joints(
         last_commanded_joints=[0, 0, 0, 0, 0, 0],
@@ -66,3 +66,11 @@ def test_feedback_extraction_handles_nested_joint_state_attrs() -> None:
         joint_state = JointState()
 
     assert extract_feedback_joints_raw(Feedback()) == [1000, 2000, -3000, 4000, 5000, -6000]
+
+
+def test_command_path_clamps_to_piper_x_bounds() -> None:
+    assert choose_command_joints(
+        last_commanded_joints=None,
+        target_joints=[154000, 195000, -175000, 106000, -106000, 200000],
+        safety_config=safety_config(enable_slew_limit=False),
+    ) == [150000, 180000, -170000, 89000, -89000, 170000]

@@ -72,10 +72,16 @@ After startup initialization, the slave does not reject or slow down a normal
 target just because it differs from the previous target. The default path sends
 the latest valid target to `JointCtrl()` immediately.
 
-The checked-in hard bounds are intentionally simple and wide enough for normal
-Piper master-slave teleop: J1 `-154..154`, J2 `0..195`, J3 `-175..0`, J4
-`-106..106`, J5 `-75..75`, and J6 `-100..100` degrees. These are local clamps
-before sending the existing direct `JointCtrl()` command.
+The checked-in hard bounds use the official Piper-X SDK presets:
+J1 `-150..150`, J2 `0..180`, J3 `-170..0`, J4 `-89..89`,
+J5 `-89..89`, and J6 `-170..170` degrees. These are local clamps
+before sending `JointCtrl()`; they do not write persistent firmware settings.
+Source: [AgileX pyAgxArm model presets](https://github.com/agilexrobotics/pyAgxArm/blob/master/pyAgxArm/api/constants.py).
+
+The receiver still uses `piper_sdk.C_PiperInterface_V2`. Updating these clamps
+is not an SDK migration or hardware compatibility certification. Installed SDK
+limits and the arm's firmware limits can further restrict commands. Verify both
+before motion; do not disable their limits merely to match this preset.
 
 An optional hidden fallback can be enabled with `safety.enable_slew_limit: true`
 and `safety.max_step_deg`, but the default is `false` because always limiting

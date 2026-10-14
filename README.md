@@ -189,8 +189,8 @@ Important defaults:
 - Follow/high-follow mode: `0xAD`
 - Startup init mode: `align`
 - Startup alignment threshold: `15 deg`
-- Joint hard bounds: J1 `-154..154`, J2 `0..195`, J3 `-175..0`,
-  J4 `-106..106`, J5 `-75..75`, J6 `-100..100` degrees
+- Joint hard bounds: J1 `-150..150`, J2 `0..180`, J3 `-170..0`,
+  J4 `-89..89`, J5 `-89..89`, J6 `-170..170` degrees (Piper-X presets)
 - Slew limiting: disabled by default
 
 ## Troubleshooting Summary

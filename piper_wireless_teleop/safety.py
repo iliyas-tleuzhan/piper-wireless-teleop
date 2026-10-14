@@ -1,4 +1,4 @@
-"""Safety helpers for raw Piper joint targets.
+"""Safety helpers for raw Piper-X joint targets.
 
 Piper joint targets are represented in raw units of 0.001 degrees. The helpers
 here clamp decoded targets to documented joint ranges, validate packet shape,
@@ -11,13 +11,16 @@ from collections.abc import Sequence
 
 RAW_UNITS_PER_DEGREE = 1000
 
+# AgileX pyAgxArm Piper-X preset (degrees converted to 0.001-degree units).
+# https://github.com/agilexrobotics/pyAgxArm/blob/master/pyAgxArm/api/constants.py
+# These local command clamps do not write firmware limits or configure SDK limits.
 JOINT_LIMITS_RAW: tuple[tuple[int, int], ...] = (
-    (-154000, 154000),
-    (0, 195000),
-    (-175000, 0),
-    (-106000, 106000),
-    (-75000, 75000),
-    (-100000, 100000),
+    (-150000, 150000),
+    (0, 180000),
+    (-170000, 0),
+    (-89000, 89000),
+    (-89000, 89000),
+    (-170000, 170000),
 )
 
 
