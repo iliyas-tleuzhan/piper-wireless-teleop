@@ -1,23 +1,24 @@
 # Dual Piper-X Wi-Fi teleoperation
 
 Pi 5 (Ubuntu Server 24.04 ARM64): two master CAN buses. Orin: two slave CAN buses.
-Left uses UDP 5005; right uses UDP 5006. Slave defaults: left can2, right can3.
-Master defaults are provisional: left can0, right can1. Edit configs/dual_arm.yaml
+Left uses UDP 5005; right uses UDP 5006. Slave defaults: left can3, right can2.
+Master defaults: left can0, right can1. Edit configs/dual_arm.yaml
 on each device to match the physical adapters. Each arm needs a separate CAN bus.
 Do not connect two arms with overlapping CAN IDs to the same bus. Verify adapter
 mapping after reboot/replug; numbering alone does not establish physical identity.
 
 ## Build and transfer only the necessary files
-On the laptop, from the dual-piper-teleop checkout:
+On the laptop, from the repository checkout:
 
 ```bash
 python scripts/build_runtime_bundle.py
-scp dist/piper-teleop-master.zip <PI_USER>@<PI_IP>:~/
-scp dist/piper-teleop-slave.zip <ORIN_USER>@<ORIN_IP>:~/
+ssh dase-raspberrypi@192.168.1.145 "mkdir -p ~/iliyas"
+scp bundles/piper-teleop-master.zip dase-raspberrypi@192.168.1.145:~/iliyas/
+ssh dase-orin@192.168.1.144 "mkdir -p ~/iliyas"
+scp bundles/piper-teleop-slave.zip dase-orin@192.168.1.144:~/iliyas/
 ```
 
-Use your actual usernames and IPs. The previously documented Orin IP is not
-proof of its current address. Bundles exclude Git history, tests, Arduino/LoRa,
+These addresses match the current setup; adjust if the network changes. Bundles exclude Git history, tests, Arduino/LoRa,
 chassis code, and development utilities. They contain only the selected worker,
 its runtime modules, configuration, setup scripts and this guide.
 
@@ -31,18 +32,20 @@ sudo apt install --no-install-recommends python3-venv iproute2 unzip
 On the Pi:
 
 ```bash
-unzip piper-teleop-master.zip
+cd ~/iliyas
+unzip -o piper-teleop-master.zip
 cd piper-teleop-master
 bash scripts/install_runtime.sh master
 bash scripts/setup_can.sh can0
 bash scripts/setup_can.sh can1
-.venv/bin/python -m piper_wireless_teleop.dual_arm master --target-ip <ORIN_IP> --deadman --dry-run
+.venv/bin/python -m piper_wireless_teleop.dual_arm master --target-ip 192.168.1.144 --deadman --dry-run
 ```
 
 On the Orin:
 
 ```bash
-unzip piper-teleop-slave.zip
+cd ~/iliyas
+unzip -o piper-teleop-slave.zip
 cd piper-teleop-slave
 bash scripts/install_runtime.sh slave
 bash scripts/setup_can.sh can2
@@ -68,7 +71,7 @@ Keep the slave power cutoff accessible. Start on Orin:
 Then on Pi:
 
 ```bash
-.venv/bin/python -m piper_wireless_teleop.dual_arm master --target-ip <ORIN_IP> --deadman
+.venv/bin/python -m piper_wireless_teleop.dual_arm master --target-ip 192.168.1.144 --deadman
 ```
 
 The slave workers retain existing alignment startup. Logs are labeled LEFT/RIGHT.
@@ -102,3 +105,10 @@ The existing piper_sdk backend is retained; SDK/firmware compatibility remains
 subject to device checks. No MIT/CPV joint sign correction is applied to this
 JointCtrl position-command path. See the official model presets:
 https://github.com/agilexrobotics/pyAgxArm/blob/master/pyAgxArm/api/constants.py
+
+## Update an existing deployment
+Stop teleop on both machines before transferring and extracting updated ZIPs.
+Extract with `unzip -o` into ~/iliyas to preserve the existing .venv. Review
+configs/dual_arm.yaml afterwards: extracting overwrites configuration edits.
+Rerun install_runtime.sh only when dependencies change. Numbered CAN names can
+swap after reboot; always verify physical left/right assignment before motion.

@@ -16,8 +16,8 @@ def test_defaults_and_commands():
     args = argparse.Namespace(role="slave", config=str(ROOT / "configs/default.yaml"),
                               bind_ip="0.0.0.0", confirm="MOVE", init_mode="align")
     commands = build_commands(args, routes)
-    assert commands["left"][commands["left"].index("--can") + 1] == "can2"
-    assert commands["right"][commands["right"].index("--can") + 1] == "can3"
+    assert commands["left"][commands["left"].index("--can") + 1] == "can3"
+    assert commands["right"][commands["right"].index("--can") + 1] == "can2"
     assert commands["left"][commands["left"].index("--udp-port") + 1] == "5005"
     assert commands["right"][commands["right"].index("--udp-port") + 1] == "5006"
 

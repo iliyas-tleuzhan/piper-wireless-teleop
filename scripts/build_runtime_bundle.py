@@ -21,13 +21,17 @@ def build_bundle(role, output):
         for name in files:
             # Normalize text even when built from a Windows checkout.
             data = (ROOT / name).read_bytes().replace(b"\r\n", b"\n")
-            archive.writestr(f"piper-teleop-{role}/{name}", data)
+            info = zipfile.ZipInfo(f"piper-teleop-{role}/{name}", date_time=(2026, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3
+            info.external_attr = (0o100644 << 16)
+            archive.writestr(info, data)
     return target
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--role", choices=("master", "slave", "both"), default="both")
-    parser.add_argument("--output", default=str(ROOT / "dist"))
+    parser.add_argument("--output", default=str(ROOT / "bundles"))
     args = parser.parse_args()
     for role in (("master", "slave") if args.role == "both" else (args.role,)):
         print(build_bundle(role, args.output))
