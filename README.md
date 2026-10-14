@@ -210,3 +210,7 @@ Important defaults:
   keep the control machines close to the access point.
 
 More detail is in `docs/`.
+
+## Dual-arm Wi-Fi (Pi 5 + Orin)
+
+See [dual-arm deployment and operation](docs/dual-arm.md). The launcher runs left/right pairs on separate UDP ports. Orin defaults are left `can2`, right `can3`. Build minimal role-specific archives with `python scripts/build_runtime_bundle.py`.

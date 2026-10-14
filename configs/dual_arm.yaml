@@ -1,0 +1,10 @@
+# Master CAN mapping is provisional: verify physical left/right before motion.
+arms:
+  left:
+    master_can: can0
+    slave_can: can2
+    udp_port: 5005
+  right:
+    master_can: can1
+    slave_can: can3
+    udp_port: 5006
