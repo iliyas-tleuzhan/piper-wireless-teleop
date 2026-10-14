@@ -13,6 +13,7 @@ def build_bundle(role, output):
     files = [f"piper_wireless_teleop/{name}" for name in COMMON + MODULES[role]]
     files += ["configs/default.yaml", "configs/dual_arm.yaml", "scripts/setup_can.sh", "scripts/install_runtime.sh",
               f"requirements-{role}.txt", "docs/dual-arm.md", "AGENTS.md"]
+    files += [f"docs/bundles/{role}-README.md"]
     files += ["scripts/master_sender.py" if role == "master" else "scripts/slave_receiver.py"]
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
@@ -21,7 +22,8 @@ def build_bundle(role, output):
         for name in files:
             # Normalize text even when built from a Windows checkout.
             data = (ROOT / name).read_bytes().replace(b"\r\n", b"\n")
-            info = zipfile.ZipInfo(f"piper-teleop-{role}/{name}", date_time=(2026, 1, 1, 0, 0, 0))
+            bundle_name = "README.md" if name == f"docs/bundles/{role}-README.md" else name
+            info = zipfile.ZipInfo(f"piper-teleop-{role}/{bundle_name}", date_time=(2026, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             info.create_system = 3
             info.external_attr = (0o100644 << 16)
