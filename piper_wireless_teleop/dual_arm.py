@@ -74,7 +74,10 @@ def supervise(commands):
             if stopping.is_set():
                 break
             worker = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=subprocess.PIPE,
-                                      stderr=subprocess.STDOUT, text=True)
+                                      stderr=subprocess.STDOUT, text=True,
+                                      # Isolate Linux workers from terminal Ctrl+C;
+                                      # the supervisor delivers one cleanup signal.
+                                      start_new_session=(os.name == "posix"))
             workers.append(worker)
             reader = threading.Thread(target=relay, args=(label, worker.stdout), daemon=True)
             reader.start()

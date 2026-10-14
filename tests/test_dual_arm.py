@@ -135,3 +135,20 @@ def test_extracted_bundle_worker_imports_without_checkout(tmp_path, role):
                             cwd=root, env=env, capture_output=True, text=True, timeout=10)
     assert result.returncode == 0, result.stderr
     assert "usage:" in result.stdout
+
+
+def test_supervisor_isolates_workers_from_terminal_signals(monkeypatch):
+    import piper_wireless_teleop.dual_arm as dual
+    import io
+    class Worker:
+        def __init__(self): self.stdout = io.StringIO()
+        def poll(self): return 2
+        def wait(self, timeout=None): return 2
+    calls = []
+    def spawn(*args, **kwargs):
+        calls.append(kwargs)
+        return Worker()
+    monkeypatch.setattr(dual.subprocess, "Popen", spawn)
+    assert dual.supervise({"left": ["worker"], "right": ["worker"]}) == 2
+    assert len(calls) == 2
+    assert all(call["start_new_session"] == (os.name == "posix") for call in calls)
