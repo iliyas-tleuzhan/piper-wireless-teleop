@@ -152,3 +152,16 @@ def test_supervisor_isolates_workers_from_terminal_signals(monkeypatch):
     assert dual.supervise({"left": ["worker"], "right": ["worker"]}) == 2
     assert len(calls) == 2
     assert all(call["start_new_session"] == (os.name == "posix") for call in calls)
+
+
+@pytest.mark.parametrize("role", ["master", "slave"])
+def test_bundle_has_role_readme_at_root(tmp_path, role):
+    spec = importlib.util.spec_from_file_location("bundle_readme", ROOT / "scripts/build_runtime_bundle.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    with zipfile.ZipFile(module.build_bundle(role, tmp_path)) as archive:
+        readme = archive.read(f"piper-teleop-{role}/README.md").decode("utf-8")
+        assert f"# {role.capitalize()} bundle:" in readme
+        assert "250 Hz has not been implemented" in readme
+        assert "| Left | can0 | can3 | 5005 |" in readme
+        assert f"scripts/{'master_sender' if role == 'master' else 'slave_receiver'}.py" in readme
