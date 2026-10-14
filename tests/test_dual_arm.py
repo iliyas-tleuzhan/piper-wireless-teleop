@@ -113,3 +113,25 @@ def test_bundle_normalizes_windows_shell_line_endings(tmp_path, monkeypatch):
         payload = bundle.read("piper-teleop-slave/scripts/install_runtime.sh")
         assert b"\r" not in payload
         assert b"set -euo pipefail\n" in payload
+
+
+@pytest.mark.parametrize("role", ["master", "slave"])
+def test_extracted_bundle_worker_imports_without_checkout(tmp_path, role):
+    """Worker --help exercises imports without connecting to hardware."""
+    import subprocess
+    spec = importlib.util.spec_from_file_location("bundle_imports", ROOT / "scripts/build_runtime_bundle.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    with zipfile.ZipFile(module.build_bundle(role, tmp_path)) as bundle:
+        bundle.extractall(tmp_path / "extract")
+    root = tmp_path / "extract" / f"piper-teleop-{role}"
+    env = dict(os.environ)
+    # Preserve installed test dependencies, but remove the source checkout.
+    paths = [entry for entry in env.get("PYTHONPATH", "").split(os.pathsep)
+             if entry and Path(entry).resolve() != ROOT]
+    env["PYTHONPATH"] = os.pathsep.join([str(root), *paths])
+    worker = "master_sender.py" if role == "master" else "slave_receiver.py"
+    result = subprocess.run([sys.executable, str(root / "scripts" / worker), "--help"],
+                            cwd=root, env=env, capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stderr
+    assert "usage:" in result.stdout

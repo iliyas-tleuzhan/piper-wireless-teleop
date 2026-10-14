@@ -4,8 +4,8 @@ from pathlib import Path
 import argparse
 import zipfile
 ROOT = Path(__file__).resolve().parents[1]
-COMMON = ["__init__.py", "config.py", "logging_utils.py", "packet.py", "udp_transport.py", "dual_arm.py"]
-MODULES = {"master": ["master_can_reader.py"], "slave": ["can_utils.py", "receiver_state.py", "safety.py", "slave_can_writer.py"]}
+COMMON = ["__init__.py", "config.py", "logging_utils.py", "packet.py", "safety.py", "udp_transport.py", "dual_arm.py"]
+MODULES = {"master": ["master_can_reader.py"], "slave": ["can_utils.py", "receiver_state.py", "slave_can_writer.py"]}
 
 def build_bundle(role, output):
     if role not in MODULES:
