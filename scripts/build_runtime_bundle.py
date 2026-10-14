@@ -19,7 +19,9 @@ def build_bundle(role, output):
     target = output / f"piper-teleop-{role}.zip"
     with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as archive:
         for name in files:
-            archive.write(ROOT / name, f"piper-teleop-{role}/{name}")
+            # Normalize text even when built from a Windows checkout.
+            data = (ROOT / name).read_bytes().replace(b"\r\n", b"\n")
+            archive.writestr(f"piper-teleop-{role}/{name}", data)
     return target
 
 def main():

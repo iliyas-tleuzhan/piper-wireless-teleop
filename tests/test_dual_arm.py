@@ -97,3 +97,19 @@ def test_master_commands_keep_separate_routes():
 def test_worker_failure_terminates_other_worker():
     assert supervise({"left": [sys.executable, "-c", "import time; time.sleep(30)"],
                       "right": [sys.executable, "-c", "exit(4)"]}) == 4
+
+
+def test_bundle_normalizes_windows_shell_line_endings(tmp_path, monkeypatch):
+    spec = importlib.util.spec_from_file_location("bundle_crlf", ROOT / "scripts/build_runtime_bundle.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    source = tmp_path / "source"
+    import shutil
+    shutil.copytree(ROOT, source, ignore=shutil.ignore_patterns(".git", "dist", "__pycache__", ".pytest_cache"))
+    script = source / "scripts/install_runtime.sh"
+    script.write_bytes(script.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
+    monkeypatch.setattr(module, "ROOT", source)
+    with zipfile.ZipFile(module.build_bundle("slave", tmp_path / "output")) as bundle:
+        payload = bundle.read("piper-teleop-slave/scripts/install_runtime.sh")
+        assert b"\r" not in payload
+        assert b"set -euo pipefail\n" in payload
