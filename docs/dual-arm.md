@@ -112,3 +112,14 @@ Extract with `unzip -o` into ~/iliyas to preserve the existing .venv. Review
 configs/dual_arm.yaml afterwards: extracting overwrites configuration edits.
 Rerun install_runtime.sh only when dependencies change. Numbered CAN names can
 swap after reboot; always verify physical left/right assignment before motion.
+
+## Stable adapter registration
+
+Each bundle README describes `python -m piper_wireless_teleop.can_identity`.
+Use `list`, then `register --role master|slave --left <current interface>
+--right <current interface>` after physically identifying cables. After reboot,
+use `check --role ...` and `setup --role ...`; the launcher resolves registered
+serials/USB paths automatically. Registration is local and is excluded from ZIPs
+and Git. Without registration the existing YAML CAN defaults still apply.
+Registration prevents interface-number swaps; it cannot detect swapped CAN cables
+or identify an arm's handedness. Preserve the registration JSON when updating.

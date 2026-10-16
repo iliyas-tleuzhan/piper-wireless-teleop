@@ -12,3 +12,7 @@ build/
 .DS_Store
 
 .venv/
+
+# Per-machine adapter registrations (never distribute to other hosts)
+configs/can-identities-*.json
+configs/can-identities-*.json.tmp

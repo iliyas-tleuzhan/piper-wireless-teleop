@@ -9,6 +9,7 @@ import sys
 import threading
 import time
 import yaml
+from .can_identity import default_map, resolve_file
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -110,6 +111,7 @@ def supervise(commands):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("role", choices=("master", "slave"))
+    parser.add_argument("--identity-map", type=Path, help="Explicit registered adapter map; missing/ambiguous adapters prevent startup")
     parser.add_argument("--routing", default=str(ROOT / "configs/dual_arm.yaml"))
     parser.add_argument("--config", default=str(ROOT / "configs/default.yaml"))
     parser.add_argument("--target-ip")
@@ -117,7 +119,7 @@ def main(argv=None):
     parser.add_argument("--deadman", action="store_true")
     parser.add_argument("--confirm", default="")
     parser.add_argument("--init-mode", choices=("align", "offset", "none"), default="align")
-    parser.add_argument("--dry-run", action="store_true", help="Print routing without starting workers or accessing hardware")
+    parser.add_argument("--dry-run", action="store_true", help="Print routing without starting workers; reads USB identities if registered")
     args = parser.parse_args(argv)
     if args.role == "master" and not args.target_ip:
         parser.error("master requires --target-ip")
@@ -125,6 +127,14 @@ def main(argv=None):
         parser.error("slave requires --confirm MOVE")
     try:
         routes = load_routes(args.routing)
+        identity_path = args.identity_map if args.identity_map is not None else default_map(args.role)
+        if args.identity_map is not None or identity_path.exists():
+            names = resolve_file(identity_path, args.role)
+            for label, name in names.items():
+                routes[label][f"{args.role}_can"] = name
+            print(f"Using registered USB adapters from {identity_path}", flush=True)
+        else:
+            print("No registered USB map; using configured CAN numbers. Verify physical mapping.", flush=True)
         if not Path(args.config).is_file():
             raise ValueError("runtime config does not exist")
         commands = build_commands(args, routes)

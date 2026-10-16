@@ -134,3 +134,12 @@ record deployed versions for a reproducible installation.
 
 Work on a development branch and commit as Iliyas. Commit/merge main only when
 explicitly instructed. See [AGENTS.md](AGENTS.md).
+
+## Automatic CAN selection
+
+The [master](docs/bundles/master-README.md) and [slave](docs/bundles/slave-README.md)
+guides explain one-time USB adapter registration. The launcher then resolves
+left/right by unique serial number or fixed USB port instead of trusting canN.
+Missing or ambiguous registered adapters prevent startup. Run the identity tool's
+setup command after reboot to configure the resolved buses. It identifies CAN
+adapters, not the attached arms; confirm the initial physical cable mapping.

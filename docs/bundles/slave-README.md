@@ -126,3 +126,42 @@ sibling; this does not remotely stop the other computer or disable motor power.
 Source repository: https://github.com/iliyas-tleuzhan/piper-wireless-teleop
 These are minimal deployment archives, not Git checkouts. Modify source and run
 `python scripts/build_runtime_bundle.py` to regenerate them.
+
+## Remember USB adapters (recommended)
+
+Stop teleop and physically trace left/right cables once. List the current adapters:
+
+```bash
+.venv/bin/python -m piper_wireless_teleop.can_identity list
+```
+
+Register using the CURRENT interface names (the example assumes the table above):
+
+```bash
+.venv/bin/python -m piper_wireless_teleop.can_identity register --role slave --left can2 --right can3
+
+```
+
+After reboot, resolve the adapters and configure their current CAN names:
+
+```bash
+.venv/bin/python -m piper_wireless_teleop.can_identity check --role slave
+.venv/bin/python -m piper_wireless_teleop.can_identity setup --role slave
+
+```
+
+The usual dual_arm launcher automatically loads this registration, including in
+--dry-run. It prefers a unique adapter serial; without one it binds to the USB
+port path. Keep ports/hubs unchanged for path-based registration. It remembers
+adapters, not physical arms: swapping CAN cables between adapters changes which
+arm is controlled. Duplicate serials discovered later or missing adapters prevent
+startup; no fallback to numbered CAN names occurs after registration. Check output
+and physically verify mapping before motion. Unsupported non-USB adapters cannot
+be registered by this tool. setup brings CAN down/up and must run only with teleop
+stopped; it does not send motor commands.
+
+Registration lives in configs/can-identities-slave.json on THIS computer.
+It survives ZIP extraction with unzip -o but is lost if you delete the deployment
+folder. Back it up locally; do not copy it to the other host. No extra packages
+or udev rules are required. Re-register after replacing an adapter, changing USB
+topology for a port-bound device, or changing which arm its CAN cable connects to.
