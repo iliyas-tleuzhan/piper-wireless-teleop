@@ -8,7 +8,7 @@ Running with --confirm MOVE enables robot motion.
 - SSH: `ssh dase-orin@192.168.1.144`.
 - Install directory: `~/iliyas/piper-teleop-slave`.
 - Master Pi: `192.168.1.145`.
-- Confirmed slave routing: LEFT can3; RIGHT can2.
+- Confirmed slave routing: LEFT can2; RIGHT can3.
 
 ## Where to find things
 
@@ -64,8 +64,8 @@ From this directory, start Orin before the Pi master launcher:
 .venv/bin/python -m piper_wireless_teleop.dual_arm slave --confirm MOVE
 ```
 
-LEFT listens on UDP 5005 and commands can3; RIGHT listens on UDP 5006 and commands
-can2. Startup waits for joint targets within 15 degrees of slave feedback, then
+LEFT listens on UDP 5005 and commands can2; RIGHT listens on UDP 5006 and commands
+can3. Startup waits for joint targets within 15 degrees of slave feedback, then
 slowly aligns the slave. Gripper commands begin after initialization. No collision
 avoidance or synchronized two-arm execution is provided.
 
@@ -89,8 +89,8 @@ SDK source: https://github.com/agilexrobotics/pyAgxArm/blob/master/pyAgxArm/api/
 
 | Side | Pi master | Orin slave | UDP port |
 | --- | --- | --- | --- |
-| Left | can0 | can3 | 5005 |
-| Right | can1 | can2 | 5006 |
+| Left | can2 | can2 | 5005 |
+| Right | can1 | can3 | 5006 |
 
 Each arm uses a separate CAN bus at 1 Mbps. Numbered CAN interfaces can swap
 after reboot or USB reconnect; verify the physical mapping before motion.

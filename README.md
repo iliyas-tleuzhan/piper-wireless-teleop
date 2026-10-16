@@ -9,8 +9,8 @@ LoRa transport are outside this repository's dual-arm runtime.
 
 | Side | Pi master CAN | Orin slave CAN | UDP port |
 | --- | --- | --- | --- |
-| Left | can0 | can3 | 5005 |
-| Right | can1 | can2 | 5006 |
+| Left | can2 | can2 | 5005 |
+| Right | can1 | can3 | 5006 |
 
 - Pi: Ubuntu Server 24.04 ARM64; SSH `dase-raspberrypi@192.168.1.145`.
 - Orin: Ubuntu 22.04 ARM64; SSH `dase-orin@192.168.1.144`.
@@ -44,7 +44,7 @@ cd ~/iliyas
 unzip -o piper-teleop-master.zip
 cd piper-teleop-master
 bash scripts/install_runtime.sh master
-bash scripts/setup_can.sh can0
+bash scripts/setup_can.sh can2
 bash scripts/setup_can.sh can1
 .venv/bin/python -m piper_wireless_teleop.dual_arm master --target-ip 192.168.1.144 --deadman --dry-run
 ```

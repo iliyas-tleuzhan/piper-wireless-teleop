@@ -1,8 +1,8 @@
 # Dual Piper-X Wi-Fi teleoperation
 
 Pi 5 (Ubuntu Server 24.04 ARM64): two master CAN buses. Orin: two slave CAN buses.
-Left uses UDP 5005; right uses UDP 5006. Slave defaults: left can3, right can2.
-Master defaults: left can0, right can1. Edit configs/dual_arm.yaml
+Left uses UDP 5005; right uses UDP 5006. Slave defaults: left can2, right can3.
+Master defaults: left can2, right can1. Edit configs/dual_arm.yaml
 on each device to match the physical adapters. Each arm needs a separate CAN bus.
 Do not connect two arms with overlapping CAN IDs to the same bus. Verify adapter
 mapping after reboot/replug; numbering alone does not establish physical identity.
@@ -36,7 +36,7 @@ cd ~/iliyas
 unzip -o piper-teleop-master.zip
 cd piper-teleop-master
 bash scripts/install_runtime.sh master
-bash scripts/setup_can.sh can0
+bash scripts/setup_can.sh can2
 bash scripts/setup_can.sh can1
 .venv/bin/python -m piper_wireless_teleop.dual_arm master --target-ip 192.168.1.144 --deadman --dry-run
 ```

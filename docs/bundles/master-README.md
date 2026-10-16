@@ -42,7 +42,7 @@ cd ~/iliyas
 unzip -o piper-teleop-master.zip
 cd piper-teleop-master
 bash scripts/install_runtime.sh master
-bash scripts/setup_can.sh can0
+bash scripts/setup_can.sh can2
 bash scripts/setup_can.sh can1
 .venv/bin/python -m piper_wireless_teleop.dual_arm master --target-ip 192.168.1.144 --deadman --dry-run
 ```
@@ -55,7 +55,7 @@ First start the slave receiver on Orin. Then, from this directory:
 .venv/bin/python -m piper_wireless_teleop.dual_arm master --target-ip 192.168.1.144 --deadman
 ```
 
-LEFT reads can0 and sends to port 5005; RIGHT reads can1 and sends to port 5006.
+LEFT reads can2 and sends to port 5005; RIGHT reads can1 and sends to port 5006.
 The process keeps transmitting while the master is stationary. It also retains
 its last complete target if master CAN input disappears. --deadman sets a packet
 flag; it is not a physical hold-to-run switch. Changing the target IP is a launcher
@@ -73,8 +73,8 @@ argument; it is not stored in dual_arm.yaml.
 
 | Side | Pi master | Orin slave | UDP port |
 | --- | --- | --- | --- |
-| Left | can0 | can3 | 5005 |
-| Right | can1 | can2 | 5006 |
+| Left | can2 | can2 | 5005 |
+| Right | can1 | can3 | 5006 |
 
 Each arm uses a separate CAN bus at 1 Mbps. Numbered CAN interfaces can swap
 after reboot or USB reconnect; verify the physical mapping before motion.

@@ -16,8 +16,8 @@ def test_defaults_and_commands():
     args = argparse.Namespace(role="slave", config=str(ROOT / "configs/default.yaml"),
                               bind_ip="0.0.0.0", confirm="MOVE", init_mode="align")
     commands = build_commands(args, routes)
-    assert commands["left"][commands["left"].index("--can") + 1] == "can3"
-    assert commands["right"][commands["right"].index("--can") + 1] == "can2"
+    assert commands["left"][commands["left"].index("--can") + 1] == "can2"
+    assert commands["right"][commands["right"].index("--can") + 1] == "can3"
     assert commands["left"][commands["left"].index("--udp-port") + 1] == "5005"
     assert commands["right"][commands["right"].index("--udp-port") + 1] == "5006"
 
@@ -87,6 +87,8 @@ def test_master_commands_keep_separate_routes():
     args = argparse.Namespace(role="master", config=str(ROOT / "configs/default.yaml"),
                               target_ip="192.0.2.10", deadman=True)
     commands = build_commands(args, routes)
+    assert routes["left"]["master_can"] == "can2"
+    assert routes["right"]["master_can"] == "can1"
     for label, port in (("left", "5005"), ("right", "5006")):
         cmd = commands[label]
         assert cmd[cmd.index("--target-port") + 1] == port
@@ -163,5 +165,5 @@ def test_bundle_has_role_readme_at_root(tmp_path, role):
         readme = archive.read(f"piper-teleop-{role}/README.md").decode("utf-8")
         assert f"# {role.capitalize()} bundle:" in readme
         assert "250 Hz has not been implemented" in readme
-        assert "| Left | can0 | can3 | 5005 |" in readme
+        assert "| Left | can2 | can2 | 5005 |" in readme
         assert f"scripts/{'master_sender' if role == 'master' else 'slave_receiver'}.py" in readme
