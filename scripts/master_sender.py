@@ -61,9 +61,12 @@ def main() -> None:
 
     try:
         while True:
-            # Keep the receive timeout short so fixed-rate UDP sending is not
-            # blocked waiting for new CAN traffic.
-            message = bus.recv(timeout=config.network.socket_timeout_s)
+            # Never let an idle CAN bus block past the next UDP deadline.
+            receive_timeout = min(
+                config.network.socket_timeout_s,
+                max(0.0, next_send - time.monotonic()),
+            )
+            message = bus.recv(timeout=receive_timeout)
             if message is not None and message.arbitration_id in MASTER_CAN_IDS:
                 decode_master_frame(message, state)
 
@@ -71,9 +74,12 @@ def main() -> None:
             if now < next_send:
                 continue
 
+            # Keep the schedule's phase; skip missed slots instead of bursting.
+            elapsed_slots = int((now - next_send) / send_interval_s) + 1
+            next_send += elapsed_slots * send_interval_s
+
             if not state.has_full_joint_target():
                 status.print("[MASTER] Waiting for complete joint target frames")
-                next_send = now + send_interval_s
                 continue
 
             # Sender wall-clock timestamp is kept only for log correlation. The
@@ -99,7 +105,6 @@ def main() -> None:
                 )
 
             sequence += 1
-            next_send = now + send_interval_s
     except KeyboardInterrupt:
         print("\n[MASTER] stopped", flush=True)
     finally:

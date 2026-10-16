@@ -1,18 +1,18 @@
 # Dual Piper-X wireless teleoperation
 
-Two master Piper-X arms on a Raspberry Pi 5 send joint/gripper targets over
+Two master Piper-X arms on Linus (a Jetson master computer) send joint/gripper targets over
 UDP/Wi-Fi to two slave arms on an NVIDIA Orin. One worker per arm keeps routing,
 packet tracking and startup alignment separate. Bunker Mini chassis control and
 LoRa transport are outside this repository's dual-arm runtime.
 
 ## Current setup
 
-| Side | Pi master CAN | Orin slave CAN | UDP port |
+| Side | Linus master CAN | Orin slave CAN | UDP port |
 | --- | --- | --- | --- |
 | Left | can2 | can2 | 5005 |
 | Right | can1 | can3 | 5006 |
 
-- Pi: Ubuntu Server 24.04 ARM64; SSH `dase-raspberrypi@192.168.1.145`.
+- Linus: Jetson master computer; SSH `<LINUS_USER>@<LINUS_IP>`.
 - Orin: Ubuntu 22.04 ARM64; SSH `dase-orin@192.168.1.144`.
 - Each arm has a separate CAN bus at 1 Mbps.
 - Mapping is in [configs/dual_arm.yaml](configs/dual_arm.yaml). Numbered adapter
@@ -22,7 +22,7 @@ LoRa transport are outside this repository's dual-arm runtime.
 
 Download the ZIP for each machine; no full repository clone is required:
 
-- [Pi master bundle](bundles/piper-teleop-master.zip): python-can and PyYAML.
+- [Linus master bundle](bundles/piper-teleop-master.zip): python-can and PyYAML.
 - [Orin slave bundle](bundles/piper-teleop-slave.zip): piper_sdk and PyYAML.
 
 Their dependencies are installed as needed. Bundles exclude tests, Git history,
@@ -37,7 +37,7 @@ sudo apt update
 sudo apt install --no-install-recommends python3-venv iproute2 unzip
 ```
 
-On the Pi, after transferring its ZIP to ~/iliyas:
+On Linus, after transferring its ZIP to ~/iliyas:
 
 ```bash
 cd ~/iliyas
@@ -73,7 +73,7 @@ Start the Orin receiver first (from its extracted bundle directory):
 .venv/bin/python -m piper_wireless_teleop.dual_arm slave --confirm MOVE
 ```
 
-Then start on the Pi:
+Then start on Linus:
 
 ```bash
 .venv/bin/python -m piper_wireless_teleop.dual_arm master --target-ip 192.168.1.144 --deadman
@@ -87,7 +87,7 @@ supervisor interrupt so cleanup is not interrupted by duplicate terminal signals
 
 ## Behavior and validation status
 
-The sender reads command IDs 0x155/0x156/0x157 and sends at 50 Hz, including while
+The sender reads command IDs 0x155/0x156/0x157 and sends at 250 Hz, including while
 the master is stationary. The receiver tracks sequences and uses a local 0.5 s
 UDP timeout; sender/receiver clocks need not match. Network loss stops new commands,
 but does not physically disable motors. The sender keeps its last complete target
@@ -97,7 +97,7 @@ Local joint clamps use official Piper-X presets in degrees: J1 +/-150, J2 0..180
 J3 -170..0, J4/J5 +/-89, J6 +/-170. They do not change firmware or SDK limits.
 The backend remains piper_sdk.C_PiperInterface_V2; firmware/SDK compatibility and
 actual slave following are still under investigation. Field logs confirmed two
-accepted UDP streams around 48 Hz and changing left-master CAN targets, but do
+accepted UDP streams around 48 Hz at the former 50 Hz setting and changing left-master CAN targets, but do
 not establish successful physical teleoperation. No collision avoidance or
 synchronized dual-arm execution is implemented.
 
@@ -143,3 +143,28 @@ left/right by unique serial number or fixed USB port instead of trusting canN.
 Missing or ambiguous registered adapters prevent startup. Run the identity tool's
 setup command after reboot to configure the resolved buses. It identifies CAN
 adapters, not the attached arms; confirm the initial physical cable mapping.
+
+## 250 Hz timing
+
+The default sender targets 250 packets/s per arm (4 ms). CAN receive waits are
+capped by the next deadline and 1 ms socket timeout. Deadlines advance on a fixed
+schedule and missed slots are skipped rather than replayed in a burst. This uses
+the supplied piper-250-edit timing implementation. Fresh master CAN data can be
+slower than UDP transmission; repeated latest targets are intentional. Linux
+scheduling, Wi-Fi jitter, CAN traffic and SDK overhead determine achieved rates.
+The older 48 Hz field observations were made with the previous 50 Hz setting.
+
+On Linus, run the optional hardware-free timing check from its bundle directory:
+
+```bash
+.venv/bin/python scripts/verify_250.py
+```
+
+This uses a simulated CAN source and real loopback UDP, not robot hardware or
+Wi-Fi. Check the printed achieved rate; it is not proof of 250 Hz physical arm
+control. The Orin logs report accepted command rate during real teleoperation.
+
+Linux/WSL verification of this version: 49 tests passed and the simulated-CAN
+loopback benchmark measured 250.06 Hz. That measurement is host-local, not an
+end-to-end Wi-Fi or physical arm measurement. Existing adapter registrations are
+machine-specific: re-register on Linus instead of copying the old master's JSON.

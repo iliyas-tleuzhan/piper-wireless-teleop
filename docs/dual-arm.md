@@ -1,6 +1,6 @@
 # Dual Piper-X Wi-Fi teleoperation
 
-Pi 5 (Ubuntu Server 24.04 ARM64): two master CAN buses. Orin: two slave CAN buses.
+Linus (Jetson master computer): two master CAN buses. Orin: two slave CAN buses.
 Left uses UDP 5005; right uses UDP 5006. Slave defaults: left can2, right can3.
 Master defaults: left can2, right can1. Edit configs/dual_arm.yaml
 on each device to match the physical adapters. Each arm needs a separate CAN bus.
@@ -12,13 +12,13 @@ On the laptop, from the repository checkout:
 
 ```bash
 python scripts/build_runtime_bundle.py
-ssh dase-raspberrypi@192.168.1.145 "mkdir -p ~/iliyas"
-scp bundles/piper-teleop-master.zip dase-raspberrypi@192.168.1.145:~/iliyas/
+ssh <LINUS_USER>@<LINUS_IP> "mkdir -p ~/iliyas"
+scp bundles/piper-teleop-master.zip <LINUS_USER>@<LINUS_IP>:~/iliyas/
 ssh dase-orin@192.168.1.144 "mkdir -p ~/iliyas"
 scp bundles/piper-teleop-slave.zip dase-orin@192.168.1.144:~/iliyas/
 ```
 
-These addresses match the current setup; adjust if the network changes. Bundles exclude Git history, tests, Arduino/LoRa,
+Orin uses the current address above; fill in Linus SSH details and adjust if the network changes. Bundles exclude Git history, tests, Arduino/LoRa,
 chassis code, and development utilities. They contain only the selected worker,
 its runtime modules, configuration, setup scripts and this guide.
 
@@ -29,7 +29,7 @@ sudo apt update
 sudo apt install --no-install-recommends python3-venv iproute2 unzip
 ```
 
-On the Pi:
+On Linus:
 
 ```bash
 cd ~/iliyas
@@ -54,7 +54,7 @@ bash scripts/setup_can.sh can3
 ```
 
 These use the native python3 on each machine, avoiding Conda and a forced Python
-3.11 installation. The Pi installs python-can and PyYAML; Orin installs piper_sdk
+3.11 installation. Linus installs python-can and PyYAML; Orin installs piper_sdk
 and PyYAML. pip installs any dependencies those packages require. Compatibility
 of the selected SDK with each device's Python and Piper-X firmware must be
 verified on hardware. Optional CAN diagnostics: install can-utils if needed.
@@ -68,7 +68,7 @@ Keep the slave power cutoff accessible. Start on Orin:
 .venv/bin/python -m piper_wireless_teleop.dual_arm slave --confirm MOVE
 ```
 
-Then on Pi:
+Then on Linus:
 
 ```bash
 .venv/bin/python -m piper_wireless_teleop.dual_arm master --target-ip 192.168.1.144 --deadman
@@ -123,3 +123,28 @@ serials/USB paths automatically. Registration is local and is excluded from ZIPs
 and Git. Without registration the existing YAML CAN defaults still apply.
 Registration prevents interface-number swaps; it cannot detect swapped CAN cables
 or identify an arm's handedness. Preserve the registration JSON when updating.
+
+## 250 Hz timing
+
+The default sender targets 250 packets/s per arm (4 ms). CAN receive waits are
+capped by the next deadline and 1 ms socket timeout. Deadlines advance on a fixed
+schedule and missed slots are skipped rather than replayed in a burst. This uses
+the supplied piper-250-edit timing implementation. Fresh master CAN data can be
+slower than UDP transmission; repeated latest targets are intentional. Linux
+scheduling, Wi-Fi jitter, CAN traffic and SDK overhead determine achieved rates.
+The older 48 Hz field observations were made with the previous 50 Hz setting.
+
+On Linus, run the optional hardware-free timing check from its bundle directory:
+
+```bash
+.venv/bin/python scripts/verify_250.py
+```
+
+This uses a simulated CAN source and real loopback UDP, not robot hardware or
+Wi-Fi. Check the printed achieved rate; it is not proof of 250 Hz physical arm
+control. The Orin logs report accepted command rate during real teleoperation.
+
+Linux/WSL verification of this version: 49 tests passed and the simulated-CAN
+loopback benchmark measured 250.06 Hz. That measurement is host-local, not an
+end-to-end Wi-Fi or physical arm measurement. Existing adapter registrations are
+machine-specific: re-register on Linus instead of copying the old master's JSON.

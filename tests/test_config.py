@@ -8,6 +8,8 @@ def test_default_config_commands_directly() -> None:
 
     config = load_config("configs/default.yaml")
 
+    assert config.network.send_rate_hz == 250
+    assert config.network.socket_timeout_s == 0.001
     assert config.network.receiver_timeout_s == 0.5
     assert config.network.status_rate_hz == 2
     assert not config.safety.enable_slew_limit

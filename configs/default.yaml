@@ -1,9 +1,9 @@
 network:
   udp_port: 5005
-  send_rate_hz: 50
+  send_rate_hz: 250
   receiver_timeout_s: 0.5
   status_rate_hz: 2
-  socket_timeout_s: 0.02
+  socket_timeout_s: 0.001
 
 can:
   bitrate: 1000000

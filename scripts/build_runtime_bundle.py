@@ -14,7 +14,7 @@ def build_bundle(role, output):
     files += ["configs/default.yaml", "configs/dual_arm.yaml", "scripts/setup_can.sh", "scripts/install_runtime.sh",
               f"requirements-{role}.txt", "docs/dual-arm.md", "AGENTS.md"]
     files += [f"docs/bundles/{role}-README.md"]
-    files += ["scripts/master_sender.py" if role == "master" else "scripts/slave_receiver.py"]
+    files += ["scripts/master_sender.py", "scripts/verify_250.py"] if role == "master" else ["scripts/slave_receiver.py"]
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     target = output / f"piper-teleop-{role}.zip"
